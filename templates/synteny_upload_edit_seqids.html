@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Edit Oxford Plot SeqIDs - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Edit Oxford Plot SeqIDs</h2>
+        <p class="lead text-white-75">Update the chromosome order for <code>{{ seqids_file_name }}</code>, then rerun the synteny comparison.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="dashboard-section shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Edit Annelida Oxford plot sequence order</h5>
+                    {% if error_message %}
+                    <div class="alert alert-danger">{{ error_message }}</div>
+                    {% endif %}
+                    {% if seqids_file_name %}
+                    <p class="text-secondary mb-4">Edit the sequence identifiers below to change the chromosome order for the Oxford plot PNG. After saving, the same background script will rerun and refresh the result files.</p>
+                    <form method="post" action="/synteny-upload/edit-seqids/?token={{ token }}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="seqids_content" class="form-label">Contents of {{ seqids_file_name }}</label>
+                            <textarea id="seqids_content" name="seqids_content" rows="14" class="form-control font-monospace">{{ seqids_content }}</textarea>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-warning">Save and rerun</button>
+                            <a href="/synteny-upload/?token={{ token }}" class="btn btn-outline-secondary">Back to results</a>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-secondary">No seqids file is available for this upload token. Return to the result page to confirm the job output.</p>
+                    <a href="/synteny-upload/?token={{ token }}" class="btn btn-outline-secondary">Back to results</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

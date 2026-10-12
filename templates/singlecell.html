@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}Single-cell - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Single-cell Analytics</h2>
+        <p class="lead text-white-75">Explore single-cell sequencing previews and discover emerging cell atlases in annelid research.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4 mb-4">
+        <div class="row gy-4 page-summary-row">
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-info h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Datasets</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.datasets }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-primary h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Species</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.species_count }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-success h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Platforms</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.platforms }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-warning h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Total Cells</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.total_cells }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-section p-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="h5 fw-bold mb-1">Single-cell Dataset Preview</h2>
+                <p class="text-muted mb-0">Preview single-cell datasets with taxonomy, cluster counts, and library metadata.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button id="downloadSinglecellBtn" class="btn btn-primary">Add Selected to Download Bar</button>
+                <a href="#" class="btn btn-outline-primary">Join Single-cell Pipeline</a>
+            </div>
+        </div>
+        {% include '_taxonomy_display_toggle.html' %}
+        <div class="table-responsive">
+            <table id="singlecellTable" class="table table-striped table-hover align-middle w-100">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center" style="width: 1%;"><input type="checkbox" id="selectAllSinglecell"></th>
+                        <th class="taxonomy-source-ncbi">Class</th>
+                        <th class="taxonomy-source-ncbi">Order</th>
+                        <th class="taxonomy-source-ncbi">Family</th>
+                        <th class="taxonomy-source-updated">Updated Clade 6</th>
+                        <th class="taxonomy-source-updated">Updated Clade 5</th>
+                        <th class="taxonomy-source-updated">Updated Clade 4</th>
+                        <th class="taxonomy-source-updated">Updated Clade 3</th>
+                        <th class="taxonomy-source-updated">Updated Clade 2</th>
+                        <th class="taxonomy-source-updated">Updated Clade 1</th>
+                        <th>Species</th>
+                        <th>Directory</th>
+                        <th>Tissue</th>
+                        <th>Stage</th>
+                        <th>Cell clusters</th>
+                        <th>Cells</th>
+                        <th>Type</th>
+                        <th>Year</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in datasets %}
+                    <tr>
+                        <td class="text-center"><input type="checkbox" class="download-checkbox" data-group="singlecell" value="{{ item.id }}"></td>
+                        <td class="taxonomy-source-ncbi">{{ item.class_name|default:'-' }}</td>
+                        <td class="taxonomy-source-ncbi">{{ item.order|default:'-' }}</td>
+                        <td class="taxonomy-source-ncbi">{{ item.family|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade6|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade5|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade4|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade3|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade2|default:'-' }}</td>
+                        <td class="taxonomy-source-updated">{{ item.taxonomy.updated_clade1|default:'-' }}</td>
+                        <td data-download-label><a href="{% url 'singlecell_detail' pk=item.id %}" class="text-decoration-none"><i>{{ item.species }}</i></a></td>
+                        <td>{{ item.dir|default:'-' }}</td>
+                        <td>{{ item.tissue|default:'-' }}</td>
+                        <td>{{ item.stage|default:'-' }}</td>
+                        <td>{{ item.clusters|default:'-' }}</td>
+                        <td>{{ item.cells|default:'-' }}</td>
+                        <td>{{ item.type|default:'-' }}</td>
+                        <td>{{ item.year|default:'-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <form id="singlecellDownloadForm" method="post" action="/download/" class="d-none">
+            {% csrf_token %}
+            <input type="hidden" name="data_type" value="singlecell">
+            <div id="singlecellDownloadInputs"></div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    $(document).ready(function() {
+        var table = $('#singlecellTable').DataTable({
+            pageLength: 10,
+            order: [[1, 'asc']],
+            language: {
+                search: 'Search:',
+                lengthMenu: 'Rows per page _MENU_',
+                info: 'Showing _START_ to _END_ of _TOTAL_ entries'
+            }
+        });
+        initTaxonomyDisplayToggle('#singlecellTable', table);
+
+        $('#selectAllSinglecell').on('change', function() {
+            $('.download-checkbox[data-group="singlecell"]').prop('checked', $(this).is(':checked'));
+        });
+
+        $('#downloadSinglecellBtn').on('click', function() {
+            var selectedItems = collectSelectedItems('singlecell', 1);
+            if (!selectedItems.length) {
+                alert('Please select at least one single-cell dataset to add to the download bar.');
+                return;
+            }
+            downloadCartAddSelected('singlecell', selectedItems);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,578 @@
+{% extends 'base.html' %}
+{% block title %}Data Download - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Download Center</h2>
+        <p class="lead text-white-75">Select genome, mitogenome or symbiont datasets and download them as a bundled archive.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4">
+        {% if download_error %}
+        <div class="alert alert-danger">{{ download_error }}</div>
+        {% endif %}
+        <div class="d-flex flex-column flex-md-row flex-wrap gap-2 mb-4">
+            <button type="button" class="btn btn-outline-primary active download-tab-btn" data-tab="genome">Genome</button>
+            <button type="button" class="btn btn-outline-primary download-tab-btn" data-tab="mitogenome">Mitogenome</button>
+            <button type="button" class="btn btn-outline-primary download-tab-btn" data-tab="symbiont">Symbiont</button>
+            <button type="button" class="btn btn-outline-primary download-tab-btn" data-tab="singlecell">Single-cell</button>
+        </div>
+
+        <div id="tab-genome" class="download-tab-content">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">Genome downloads</h3>
+                    <p class="text-muted mb-0">Select one or more species and download available genome files as a ZIP archive.</p>
+                </div>
+                <button type="button" id="downloadGenomeBtn" class="btn btn-primary">Add Selected to Download Bar</button>
+            </div>
+            <div class="download-filter-options mb-3" data-group="genome">Loading file types...</div>
+            <div class="table-responsive">
+                <table id="downloadTableGenome" class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 1%;"><input type="checkbox" class="select-all" data-group="genome"></th>
+                            <th>Class</th>
+                            <th>Order</th>
+                            <th>Family</th>
+                            <th>Species</th>
+                            <th>Size (Mb)</th>
+                            <th>GC %</th>
+                            <th>Assembly</th>
+                            <th>Files</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in genome_rows %}
+                        <tr data-group="genome" data-item-id="{{ row.taxonomy.ncbi_taxonomy_id }}">
+                            <td class="text-center"><input type="checkbox" class="download-checkbox" data-group="genome" value="{{ row.taxonomy.ncbi_taxonomy_id }}"></td>
+                            <td>{{ row.taxonomy.class_name|default:'-' }}</td>
+                            <td>{{ row.taxonomy.order|default:'-' }}</td>
+                            <td>{{ row.taxonomy.family|default:'-' }}</td>
+                            <td><a href="{% url 'genome_detail' row.taxonomy.ncbi_taxonomy_id|default:row.taxonomy.species %}" class="text-decoration-none"><i>{{ row.taxonomy.species }}</i></a></td>
+                            <td>{{ row.size_mb|default:'-' }}</td>
+                            <td>{{ row.gc_content|default:'-' }}</td>
+                            <td>{{ row.assembly_level|default:'-' }}</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary toggle-file-detail" data-group="genome">Files</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-mitogenome" class="download-tab-content d-none">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">Mitogenome downloads</h3>
+                    <p class="text-muted mb-0">Choose species with mitogenome data and download curated mitogenome collections.</p>
+                </div>
+                <button type="button" id="downloadMitogenomeBtn" class="btn btn-primary">Add Selected to Download Bar</button>
+            </div>
+            <div class="download-filter-options mb-3" data-group="mitogenome">Loading file types...</div>
+            <div class="table-responsive">
+                <table id="downloadTableMitogenome" class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 1%;"><input type="checkbox" class="select-all" data-group="mitogenome"></th>
+                            <th>Class</th>
+                            <th>Order</th>
+                            <th>Family</th>
+                            <th>Species</th>
+                            <th>Length (bp)</th>
+                            <th>Topology</th>
+                            <th>Genbank</th>
+                            <th>Files</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in mitogenome_rows %}
+                        <tr data-group="mitogenome" data-item-id="{{ row.taxonomy.ncbi_taxonomy_id }}">
+                            <td class="text-center"><input type="checkbox" class="download-checkbox" data-group="mitogenome" value="{{ row.taxonomy.ncbi_taxonomy_id }}"></td>
+                            <td>{{ row.taxonomy.class_name|default:'-' }}</td>
+                            <td>{{ row.taxonomy.order|default:'-' }}</td>
+                            <td>{{ row.taxonomy.family|default:'-' }}</td>
+                            <td><a href="{% url 'mitogenome_detail' row.taxonomy.ncbi_taxonomy_id|default:row.taxonomy.species %}" class="text-decoration-none"><i>{{ row.taxonomy.species }}</i></a></td>
+                            <td>{{ row.length_bp|default:'-' }}</td>
+                            <td>{{ row.topology|default:'-' }}</td>
+                            <td>{{ row.genbank|default:'-' }}</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary toggle-file-detail" data-group="mitogenome">Files</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-symbiont" class="download-tab-content d-none">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">Symbiont downloads</h3>
+                    <p class="text-muted mb-0">Select host species to download symbiont sequence collections packaged by host.</p>
+                </div>
+                <button type="button" id="downloadSymbiontBtn" class="btn btn-primary">Add Selected to Download Bar</button>
+            </div>
+            <div class="download-filter-options mb-3" data-group="symbiont">Loading file types...</div>
+            <div class="table-responsive">
+                <table id="downloadTableSymbiont" class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 1%;"><input type="checkbox" class="select-all" data-group="symbiont"></th>
+                            <th>Class</th>
+                            <th>Order</th>
+                            <th>Family</th>
+                            <th>Host Species</th>
+                            <th>Symbiont Type</th>
+                            <th>Files</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in symbiont_rows %}
+                        <tr data-group="symbiont" data-item-id="{% if row.taxonomy_id %}{{ row.taxonomy_id }}{% else %}{{ row.host_species }}{% endif %}" data-sub="{{ row.sub }}">
+                            <td class="text-center"><input type="checkbox" class="download-checkbox" data-group="symbiont" value="{% if row.taxonomy_id %}{{ row.taxonomy_id }}{% else %}{{ row.host_species }}{% endif %}" data-sub="{{ row.sub }}"></td>
+                            <td>{{ row.class_name|default:'-' }}</td>
+                            <td>{{ row.order|default:'-' }}</td>
+                            <td>{{ row.family|default:'-' }}</td>
+                            <td>{% if row.taxonomy_id %}<a href="{% url 'symbiont_detail' row.taxonomy_id %}?sub={{ row.sub|urlencode }}" class="text-decoration-none"><i>{{ row.host_species }}</i></a>{% else %}<span class="text-muted"><i>{{ row.host_species }}</i></span>{% endif %}</td>
+                            <td>{{ row.sub|default:'symbiont' }} / {{ row.symbiont_type|default:'-' }}</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary toggle-file-detail" data-group="symbiont">Files</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-singlecell" class="download-tab-content d-none">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">Single-cell downloads</h3>
+                    <p class="text-muted mb-0">Select one or more single-cell datasets and download metadata and RDS files as a ZIP archive.</p>
+                </div>
+                <button type="button" id="downloadSinglecellBtn" class="btn btn-primary">Add Selected to Download Bar</button>
+            </div>
+            <div class="download-filter-options mb-3 text-muted">
+                RDS files in each selected dataset directory are included automatically.
+            </div>
+            <div class="table-responsive">
+                <table id="downloadTableSinglecell" class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 1%;"><input type="checkbox" class="select-all" data-group="singlecell"></th>
+                            <th>Species</th>
+                            <th>Directory</th>
+                            <th>Tissue</th>
+                            <th>Stage</th>
+                            <th>Cell clusters</th>
+                            <th>Cells</th>
+                            <th>Platform</th>
+                            <th>Year</th>
+                            <th>Files</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in singlecell_rows %}
+                        <tr data-group="singlecell" data-item-id="{{ row.id }}">
+                            <td class="text-center"><input type="checkbox" class="download-checkbox" data-group="singlecell" value="{{ row.id }}"></td>
+                            <td><a href="{% url 'singlecell_detail' pk=row.id %}" class="text-decoration-none"><i>{{ row.species }}</i></a></td>
+                            <td>{{ row.dir|default:'-' }}</td>
+                            <td>{{ row.tissue|default:'-' }}</td>
+                            <td>{{ row.stage|default:'-' }}</td>
+                            <td>{{ row.clusters|default:'-' }}</td>
+                            <td>{{ row.cells|default:'-' }}</td>
+                            <td>{{ row.platform|default:'-' }}</td>
+                            <td>{{ row.year|default:'-' }}</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary toggle-file-detail" data-group="singlecell">Files</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <form id="batchDownloadForm" method="post" action="{% url 'download_batch' %}" class="d-none">
+            {% csrf_token %}
+            <input type="hidden" name="data_type" id="batchDownloadType">
+            <div id="batchDownloadInputs"></div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    $(document).ready(function() {
+        var downloadDataTables = {
+            genome: $('#downloadTableGenome').DataTable({
+                pageLength: 20,
+                order: [[4, 'asc']],
+                dom: '<"d-flex flex-column flex-md-row justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex align-items-center"f>>t<"d-flex flex-column flex-md-row justify-content-between align-items-center mt-3"<"mb-2 mb-md-0"i><p>>',
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Rows per page _MENU_',
+                    info: ' _START_ to _END_ rows，in _TOTAL_ rows'
+                }
+            }),
+            mitogenome: $('#downloadTableMitogenome').DataTable({
+                pageLength: 20,
+                order: [[4, 'asc']],
+                dom: '<"d-flex flex-column flex-md-row justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex align-items-center"f>>t<"d-flex flex-column flex-md-row justify-content-between align-items-center mt-3"<"mb-2 mb-md-0"i><p>>',
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Rows per page _MENU_',
+                    info: ' _START_ to _END_ rows，in _TOTAL_ rows'
+                }
+            }),
+            symbiont: $('#downloadTableSymbiont').DataTable({
+                pageLength: 20,
+                order: [[4, 'asc']],
+                dom: '<"d-flex flex-column flex-md-row justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex align-items-center"f>>t<"d-flex flex-column flex-md-row justify-content-between align-items-center mt-3"<"mb-2 mb-md-0"i><p>>',
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Rows per page _MENU_',
+                    info: ' _START_ to _END_ rows，in _TOTAL_ rows'
+                }
+            }),
+            singlecell: $('#downloadTableSinglecell').DataTable({
+                pageLength: 20,
+                order: [[1, 'asc']],
+                dom: '<"d-flex flex-column flex-md-row justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex align-items-center"f>>t<"d-flex flex-column flex-md-row justify-content-between align-items-center mt-3"<"mb-2 mb-md-0"i><p>>',
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Rows per page _MENU_',
+                    info: ' _START_ to _END_ rows，in _TOTAL_ rows'
+                }
+            })
+        };
+
+        var downloadFileOptionsCache = {};
+
+        ['genome', 'mitogenome', 'symbiont'].forEach(function(group) {
+            loadDownloadFilterTypes(group);
+        });
+
+        function getDownloadFileOptions(group, itemId, sub) {
+            var requestId = itemId;
+            if (group === 'symbiont' && String(itemId).indexOf('::') !== -1) {
+                var identifierParts = String(itemId).split('::');
+                requestId = identifierParts.shift();
+                sub = sub || identifierParts.join('::');
+            }
+            var row = $('tr[data-group="' + group + '"][data-item-id="' + requestId + '"]').first();
+            sub = group === 'symbiont' ? (sub || row.data('sub') || 'symbiont') : '';
+            var cacheKey = group + ':' + requestId + ':' + sub;
+            if (downloadFileOptionsCache[cacheKey]) {
+                return Promise.resolve(downloadFileOptionsCache[cacheKey]);
+            }
+            var query = '/download/file-options/?data_type=' + encodeURIComponent(group) + '&id=' + encodeURIComponent(requestId);
+            if (group === 'symbiont') {
+                query += '&sub=' + encodeURIComponent(sub);
+            }
+            return fetch(query, { cache: 'no-store' })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Unable to load file list.');
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    downloadFileOptionsCache[cacheKey] = data;
+                    return data;
+                });
+        }
+
+        function renderDownloadFilterOptions(group, types) {
+            var container = $('.download-filter-options[data-group="' + group + '"]');
+            container.empty();
+            container.append('<span class="text-muted me-2">Download file types:</span>');
+            types.forEach(function(type, index) {
+                var checkboxId = group + 'FilterType' + index;
+                container.append(
+                    '<div class="form-check form-check-inline">' +
+                    '<input class="form-check-input download-filter-checkbox" type="checkbox" id="' + escapeHtml(checkboxId) + '" data-group="' + escapeHtml(group) + '" value="' + escapeHtml(type) + '">' +
+                    '<label class="form-check-label" for="' + escapeHtml(checkboxId) + '">' + escapeHtml(type) + '</label>' +
+                    '</div>'
+                );
+            });
+        }
+
+        function buildQueryString(params) {
+            return Object.keys(params).map(function(key) {
+                return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+            }).join('&');
+        }
+
+        function loadDownloadFilterTypes(group) {
+            var container = $('.download-filter-options[data-group="' + group + '"]');
+            if (!container.length) {
+                return Promise.resolve();
+            }
+            container.text('Loading file types...');
+            var table = downloadDataTables[group];
+            if (!table) {
+                container.text('Unable to load file types.');
+                return Promise.resolve();
+            }
+            var itemIds = [];
+            table.rows().every(function() {
+                var row = $(this.node());
+                var itemId = row.data('item-id');
+                if (itemId) {
+                    itemIds.push(itemId);
+                }
+            });
+            if (!itemIds.length) {
+                container.text('No file types available.');
+                return Promise.resolve();
+            }
+            var query = 'data_type=' + encodeURIComponent(group);
+            itemIds.forEach(function(itemId) {
+                query += '&ids=' + encodeURIComponent(itemId);
+            });
+            return fetch('/download/file-types/?' + query, { cache: 'no-store' })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Unable to load file types.');
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    if (!Array.isArray(data.types) || !data.types.length) {
+                        container.text('No file types available.');
+                        return;
+                    }
+                    renderDownloadFilterOptions(group, data.types);
+                })
+                .catch(function() {
+                    container.text('Unable to load file types.');
+                });
+        }
+
+        function renderFileDetailsRow(row, options) {
+            var group = row.data('group');
+            var itemId = row.data('item-id');
+            var colspan = row.children().length;
+            var content = '<div class="py-3">';
+            if (!options.files || !options.files.length) {
+                content += '<div class="text-muted">No downloadable files available for this item.</div>';
+            } else {
+                content += '<div class="mb-2 text-muted">Available file collections:</div><ul class="list-unstyled mb-0">';
+                options.files.forEach(function(file, index) {
+                    var checkboxId = group + '_detail_' + itemId + '_' + index;
+                    content += '<li class="mb-2"><div class="form-check">';
+                    content += '<input class="form-check-input download-detail-file-checkbox" type="checkbox" id="' + escapeHtml(checkboxId) + '" data-group="' + escapeHtml(group) + '" data-item-id="' + escapeHtml(itemId) + '" data-file-label="' + escapeHtml(file.label) + '" data-file-name="' + escapeHtml(file.filename) + '">';
+                    content += '<label class="form-check-label" for="' + escapeHtml(checkboxId) + '"><strong>' + escapeHtml(file.label) + ':</strong> ' + escapeHtml(file.filename) + '</label>';
+                    content += '</div></li>';
+                });
+                content += '</ul>';
+            }
+            content += '</div>';
+            return '<tr class="download-file-details-row"><td colspan="' + colspan + '">' + content + '</td></tr>';
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function toggleFileDetails(button) {
+            var row = $(button).closest('tr');
+            var nextRow = row.next('.download-file-details-row');
+            if (nextRow.length) {
+                nextRow.remove();
+                $(button).text('Files');
+                return;
+            }
+            var group = $(button).data('group');
+            var itemId = row.data('item-id');
+            var sub = group === 'symbiont' ? row.data('sub') : null;
+            if (!itemId) {
+                alert('Missing item identifier.');
+                return;
+            }
+            var loadingRow = $('<tr class="download-file-details-row"><td colspan="' + row.children().length + '"><div class="py-3 text-muted">Loading files...</div></td></tr>');
+            row.after(loadingRow);
+            getDownloadFileOptions(group, itemId, sub).then(function(options) {
+                loadingRow.replaceWith(renderFileDetailsRow(row, options));
+                $(button).text('Hide');
+            }).catch(function(error) {
+                loadingRow.find('td').html('<div class="py-3 text-danger">' + escapeHtml(error.message) + '</div>');
+            });
+        }
+
+        function getActiveDownloadTypes(group) {
+            return $('.download-filter-checkbox[data-group="' + group + '"]:checked').map(function() {
+                return this.value;
+            }).get();
+        }
+
+        function collectSelectedDetailFiles(dataType, labelColumn) {
+            var nodes = document.querySelectorAll('.download-detail-file-checkbox[data-group="' + dataType + '"]:checked');
+            return Array.from(nodes).map(function(node) {
+                var itemId = node.dataset.itemId;
+                var fileLabel = node.dataset.fileLabel;
+                var row = node.closest('tr[data-item-id="' + itemId + '"]');
+                var label = itemId;
+                if (row && row.children[labelColumn]) {
+                    label = row.children[labelColumn].textContent.trim() || itemId;
+                }
+                return { id: itemId + '|' + fileLabel, label: label + ' — ' + fileLabel };
+            });
+        }
+
+        function downloadTypeMatches(optionType, selectedType) {
+            if (!optionType || !selectedType) {
+                return false;
+            }
+            return optionType.toLowerCase() === selectedType.toLowerCase();
+        }
+
+        function applyDownloadFilter(group) {
+            var selectedTypes = getActiveDownloadTypes(group);
+            var table = downloadDataTables[group];
+            if (!table) {
+                return;
+            }
+            table.rows().every(function() {
+                this.visible(true);
+                var row = $(this.node());
+                row.next('.download-file-details-row').show();
+            });
+            if (!selectedTypes.length) {
+                table.draw(false);
+                return;
+            }
+            var promises = [];
+            table.rows().every(function() {
+                var row = $(this.node());
+                var itemId = row.data('item-id');
+                var sub = group === 'symbiont' ? row.data('sub') : null;
+                if (!itemId) {
+                    return;
+                }
+                var cacheKey = group + ':' + itemId;
+                if (!downloadFileOptionsCache[cacheKey]) {
+                    promises.push(getDownloadFileOptions(group, itemId, sub));
+                }
+            });
+            Promise.all(promises).then(function() {
+                table.rows().every(function() {
+                    var row = $(this.node());
+                    var itemId = row.data('item-id');
+                    var sub = group === 'symbiont' ? row.data('sub') : null;
+                    if (!itemId) {
+                        return;
+                    }
+                    var cacheKey = group + ':' + itemId + ':' + (sub || '');
+                    var options = downloadFileOptionsCache[cacheKey] || { types: [] };
+                    var match = Array.isArray(options.types) && options.types.some(function(optionType) {
+                        return selectedTypes.some(function(type) {
+                            return downloadTypeMatches(optionType, type);
+                        });
+                    });
+                    this.visible(match);
+                    row.next('.download-file-details-row').toggle(match);
+                });
+                table.draw(false);
+            }).catch(function() {
+                alert('Unable to apply filter at this time.');
+            });
+        }
+
+        function switchTab(tabKey) {
+            $('.download-tab-btn').removeClass('active');
+            $('.download-tab-btn[data-tab="' + tabKey + '"]').addClass('active');
+            $('.download-tab-content').addClass('d-none');
+            $('#tab-' + tabKey).removeClass('d-none');
+        }
+
+        $('.download-tab-btn').on('click', function() {
+            switchTab($(this).data('tab'));
+        });
+
+        $('.select-all').on('change', function() {
+            var group = $(this).data('group');
+            $('.download-checkbox[data-group="' + group + '"]').prop('checked', $(this).is(':checked'));
+        });
+
+        $(document).on('click', '.toggle-file-detail', function() {
+            toggleFileDetails(this);
+        });
+
+        $(document).on('change', '.download-filter-checkbox', function() {
+            applyDownloadFilter($(this).data('group'));
+        });
+
+        function addToDownloadBar(dataType, labelColumn) {
+            var detailItems = collectSelectedDetailFiles(dataType, labelColumn);
+            if (detailItems.length) {
+                downloadCartAddSelected(dataType, detailItems);
+                return;
+            }
+            var selectedItems = collectSelectedItems(dataType, labelColumn);
+            if (!selectedItems.length) {
+                alert('Please select at least one row to add to the download bar.');
+                return;
+            }
+            var activeTypes = getActiveDownloadTypes(dataType);
+            if (!activeTypes.length) {
+                downloadCartAddSelected(dataType, selectedItems);
+                return;
+            }
+            var loadPromises = selectedItems.map(function(item) {
+                return getDownloadFileOptions(dataType, item.id).then(function(options) {
+                    return {
+                        item: item,
+                        options: options,
+                    };
+                });
+            });
+            Promise.all(loadPromises).then(function(rows) {
+                var itemsToAdd = [];
+                rows.forEach(function(row) {
+                    var item = row.item;
+                    var availableFiles = row.options.files || [];
+                    availableFiles.forEach(function(file) {
+                        if (activeTypes.some(function(type) {
+                            return downloadTypeMatches(file.label, type);
+                        })) {
+                            itemsToAdd.push({
+                                id: item.id + '|' + file.label,
+                                label: item.label + ' — ' + file.label,
+                            });
+                        }
+                    });
+                });
+                if (!itemsToAdd.length) {
+                    alert('No selected rows contain files matching the chosen download types.');
+                    return;
+                }
+                downloadCartAddSelected(dataType, itemsToAdd);
+            }).catch(function(error) {
+                alert('Unable to add selected rows: ' + error.message);
+            });
+        }
+
+        $('#downloadGenomeBtn').on('click', function() { addToDownloadBar('genome', 4); });
+        $('#downloadMitogenomeBtn').on('click', function() { addToDownloadBar('mitogenome', 4); });
+        $('#downloadSymbiontBtn').on('click', function() { addToDownloadBar('symbiont', 4); });
+        $('#downloadSinglecellBtn').on('click', function() { addToDownloadBar('singlecell', 1); });
+    });
+</script>
+{% endblock %}

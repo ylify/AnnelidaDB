@@ -1,0 +1,607 @@
+{% extends 'base.html' %}
+{% block title %}BLAST - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Private BLAST Search</h2>
+        <p class="lead text-white-50">Run a private sequence alignment on the local AnnelidaDB.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="dashboard-section shadow-sm p-4">
+                <form id="blastForm">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">BLAST Program</label>
+                            <select id="programSelect" class="form-select" onchange="updateProgramHint(); updateDatabaseOptions();">
+                                <option value="blastn">blastn (nucleotide query vs nucleotide database)</option>
+                                <option value="blastp">blastp (protein query vs protein database)</option>
+                                <option value="blastx">blastx (translated nucleotide query vs protein database)</option>
+                                <option value="tblastn">tblastn (protein query vs translated nucleotide database)</option>
+                                <option value="tblastx">tblastx (translated nucleotide query vs translated nucleotide database)</option>
+                            </select>
+                            <div id="programHint" class="form-text text-muted">blastn is selected by default.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Database</label>
+                            <select id="databaseSelect" class="form-select"></select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">E-value cutoff</label>
+                            <input type="text" id="evalueInput" class="form-control" value="1e-5">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Max target sequences</label>
+                            <input type="number" id="maxTargetInput" class="form-control" value="10" min="1" max="500">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Upload FASTA file (optional)</label>
+                        <input type="file" id="sequenceFileInput" class="form-control" accept=".fa,.fasta,.txt">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Or paste FASTA formatted sequence below:</label>
+                        <textarea class="form-control" id="sequenceInput" rows="6" placeholder=">Sequence_1\nATGCGTACGTAGCTAGCT..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Email address (optional)</label>
+                        <input type="email" id="blastEmailInput" class="form-control" placeholder="user@example.com">
+                        <div class="form-text">If you provide an email, we will send the BLAST job link to you.</div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-primary btn-lg" id="runBlastBtn">
+                            <span id="btnText">Run Private BLAST</span>
+                            <div class="spinner-border spinner-border-sm text-light ms-2" id="loadingSpinner" role="status" style="display:none;"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div id="blastJobInfo" class="mb-3" style="display:none;"></div>
+            <div class="dashboard-section shadow-sm mt-4" id="resultSection" style="display:none;">
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="pageSizeSelect" class="mb-0 fw-semibold">Rows per page:</label>
+                        <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="downloadResultsBtn">Download Results</button>
+                        <span id="pageInfo" class="text-muted">Showing first 20 results</span>
+                    </div>
+                </div>
+                <h4 class="mb-3">Alignment Results</h4>
+                <div class="table-responsive">
+                    <table id="blastResultsTable" class="table table-hover table-bordered table-sm text-nowrap" style="width: 100%; table-layout: auto;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="min-width: 120px;">Query</th>
+                                <th style="min-width: 220px;">Subject</th>
+                                <th style="min-width: 180px;">Gene Family</th>
+                                <th style="min-width: 140px;">Annotation</th>
+                                <th style="min-width: 140px;">Alignment</th>
+                                <th style="min-width: 160px;">Species</th>
+                                <th style="min-width: 90px;">Identity</th>
+                                <th style="min-width: 70px;">Length</th>
+                                <th style="min-width: 90px;">Mismatch</th>
+                                <th style="min-width: 90px;">Gap Open</th>
+                                <th style="min-width: 110px;">Q-range</th>
+                                <th style="min-width: 110px;">S-range</th>
+                                <th style="min-width: 90px;">E-value</th>
+                                <th style="min-width: 100px;">Bit Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultBody"></tbody>
+                    </table>
+                </div>
+                <style>
+                    #blastResultsTable th,
+                    #blastResultsTable td {
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                    }
+                    #blastResultsTable td {
+                        vertical-align: middle;
+                    }
+                </style>
+                <div class="modal fade" id="alignmentModal" tabindex="-1" aria-labelledby="alignmentModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="alignmentModalLabel">Alignment Details</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <pre id="alignmentText" class="bg-dark text-white p-3 rounded" style="white-space: pre-wrap; word-break: break-word;"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade" id="annotationModal" tabindex="-1" aria-labelledby="annotationModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="annotationModalLabel">Gene Annotation</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" id="annotationModalBody">
+                                <div class="text-center text-muted">Loading annotation...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <button type="button" class="btn btn-sm btn-secondary" id="prevPageBtn">Previous</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="nextPageBtn">Next</button>
+                    </div>
+                    <div id="pageMessage" class="text-muted"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    function readUploadedFile() {
+        const fileInput = document.getElementById('sequenceFileInput');
+        if (!fileInput.files.length) {
+            return Promise.resolve(null);
+        }
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Failed to read uploaded file.'));
+            reader.readAsText(fileInput.files[0]);
+        });
+    }
+
+    const programDatabaseOptions = {
+        blastn: [
+            { value: 'annelidadb_cds', label: 'Annelida.CDS.blast_db' },
+            { value: 'annelidadb_genome', label: 'Annelida.genome.blast_db' },
+        ],
+        blastp: [
+            { value: 'annelidadb_protein', label: 'Annelida.protein.blast_db' },
+        ],
+        blastx: [
+            { value: 'annelidadb_protein', label: 'Annelida.protein.blast_db' },
+        ],
+        tblastn: [
+            { value: 'annelidadb_cds', label: 'Annelida.CDS.blast_db' },
+            { value: 'annelidadb_genome', label: 'Annelida.genome.blast_db' },
+        ],
+        tblastx: [
+            { value: 'annelidadb_cds', label: 'Annelida.CDS.blast_db' },
+            { value: 'annelidadb_genome', label: 'Annelida.genome.blast_db' },
+        ],
+    };
+
+    let blastResults = [];
+    let currentPage = 1;
+
+    function detectSequenceType(sequence) {
+        const cleaned = sequence.replace(/^>.*$/gm, '').replace(/\s+/g, '').toUpperCase();
+        if (!cleaned) {
+            return null;
+        }
+        const letters = cleaned.replace(/[^A-Z]/g, '');
+        if (!letters) {
+            return null;
+        }
+        const atgcCount = (letters.match(/[ATGC]/g) || []).length;
+        return atgcCount / letters.length > 0.5 ? 'nucleotide' : 'protein';
+    }
+
+    function validateQueryType(program, sequence) {
+        const detected = detectSequenceType(sequence);
+        const expected = {
+            blastn: 'nucleotide',
+            blastp: 'protein',
+            blastx: 'nucleotide',
+            tblastn: 'protein',
+            tblastx: 'nucleotide',
+        }[program];
+        if (!detected || !expected) {
+            return true;
+        }
+        if (detected !== expected) {
+            alert(`Selected BLAST program ${program} expects a ${expected} query, but the input appears to be ${detected}. Please check your sequence file or pasted input.`);
+            return false;
+        }
+        return true;
+    }
+
+    function getPageSize() {
+        return parseInt(document.getElementById('pageSizeSelect').value, 10) || 20;
+    }
+
+    function updatePageInfo() {
+        const pageSize = getPageSize();
+        const totalRows = blastResults.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        document.getElementById('pageInfo').innerText = `Showing page ${currentPage} of ${totalPages} (${totalRows} hits)`;
+        document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+        document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+    }
+
+    function renderBlastResults() {
+        const tbody = document.getElementById('resultBody');
+        const pageSize = getPageSize();
+        const startIndex = (currentPage - 1) * pageSize;
+        const pageItems = blastResults.slice(startIndex, startIndex + pageSize);
+
+        tbody.innerHTML = '';
+        if (!blastResults.length) {
+            tbody.innerHTML = '<tr><td colspan="14" class="text-center text-muted">No hits were found.</td></tr>';
+            document.getElementById('pageInfo').innerText = 'No results to display.';
+            return;
+        }
+
+        if (!pageItems.length) {
+            currentPage = 1;
+            return renderBlastResults();
+        }
+
+        pageItems.forEach((item, itemIndex) => {
+            const globalIndex = startIndex + itemIndex;
+            const qstart = item.qstart || '';
+            const qend = item.qend || '';
+            const sstart = item.sstart || '';
+            const send = item.send || '';
+            const qrange = qstart && qend ? `${qstart}-${qend}` : '—';
+            const srange = sstart && send ? `${sstart}-${send}` : '—';
+            const speciesText = item.species || 'Unknown';
+            const subjectLabel = item.subject ? item.subject.trim().replace(/.*[\/\\]/, '') : '';
+            const subjectId = subjectLabel ? subjectLabel.split(/\s+/)[0] : '';
+            const safeSubjectId = subjectId.replace(/'/g, "\\'");
+            const safeSpecies = (item.species || '').replace(/'/g, "\\'");
+            const selectedDatabase = document.getElementById('databaseSelect') ? document.getElementById('databaseSelect').value : '';
+            const isGeneLinkDatabase = selectedDatabase === 'annelidadb_cds' || selectedDatabase === 'annelidadb_protein';
+            const geneLink = subjectId ? (item.taxonomy_id ? `/species/${encodeURIComponent(item.taxonomy_id)}/gene/${encodeURIComponent(subjectId)}/` : `/gene/${encodeURIComponent(subjectId)}/`) : '';
+            const speciesLink = item.taxonomy_id ? `/species/${encodeURIComponent(item.taxonomy_id)}/` : '';
+            const annotationButton = subjectId ?
+                `<button type="button" class="btn btn-sm btn-outline-info" onclick="showGeneAnnotation('${item.taxonomy_id || ''}', '${safeSubjectId}', '${safeSpecies}')">Annotation</button>` :
+                '—';
+            const familyLinks = (item.gene_family_memberships || []).map(m => {
+                const familyUrl = `/gene-family/${encodeURIComponent(m.family_id)}/?source=${encodeURIComponent(m.source)}`;
+                return `<a href="${familyUrl}" target="_blank" class="badge bg-info text-white text-decoration-none me-1 mb-1">${m.family_id} (${m.source})</a>`;
+            }).join('');
+            const subjectLink = subjectId && isGeneLinkDatabase ?
+                `<a href="${geneLink}" target="_blank" class="text-decoration-none text-truncate d-inline-block" style="max-width: 100%;">${item.subject || '—'}</a>` :
+                `${item.subject || '—'}`;
+            const speciesField = speciesLink ?
+                `<a href="${speciesLink}" target="_blank" class="text-decoration-none">${speciesText}</a>` :
+                speciesText;
+            tbody.innerHTML += `
+<tr>
+<td>${item.query || '—'}</td>
+<td>${subjectLink}</td>
+<td>${familyLinks || '—'}</td>
+<td class="text-center">${annotationButton}</td>
+<td>${item.alignment ? `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAlignment(${globalIndex})">View Alignment</button>` : '—'}</td>
+<td>${speciesField}</td>
+<td>${item.pident || '—'}</td>
+<td>${item.length || '—'}</td>
+<td>${item.mismatch || '—'}</td>
+<td>${item.gapopen || '—'}</td>
+<td>${qrange}</td>
+<td>${srange}</td>
+<td>${item.evalue || '—'}</td>
+<td>${item.bitscore || '—'}</td>
+</tr>`;
+        });
+        updatePageInfo();
+    }
+
+    function getQueryParam(name) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
+    }
+
+    function displayBlastJobInfo(job) {
+        const container = document.getElementById('blastJobInfo');
+        if (!container) {
+            return;
+        }
+        const lines = [];
+        if (job.job_url) {
+            lines.push(`<div class="mb-2"><strong>BLAST Job Link:</strong> <a href="${job.job_url}" target="_blank">${job.job_url}</a></div>`);
+        }
+        if (job.status) {
+            lines.push(`<div class="text-muted">Job status: <strong>${job.status}</strong></div>`);
+        }
+        container.innerHTML = lines.join('');
+        container.style.display = lines.length ? 'block' : 'none';
+    }
+
+    function showAlignment(index) {
+        const item = blastResults[index];
+        if (!item) {
+            return;
+        }
+        document.getElementById('alignmentModalLabel').innerText = `Alignment: ${item.query} → ${item.subject}`;
+        document.getElementById('alignmentText').textContent = item.alignment || 'Alignment text is not available.';
+        const alignmentModal = new bootstrap.Modal(document.getElementById('alignmentModal'));
+        alignmentModal.show();
+    }
+
+    async function showGeneAnnotation(taxonomyId, geneId, species) {
+        if (!geneId) {
+            alert('Missing gene ID for annotation lookup.');
+            return;
+        }
+        const params = new URLSearchParams({ gene_id: geneId });
+        if (taxonomyId) {
+            params.set('taxonomy_id', taxonomyId);
+        } else if (species) {
+            params.set('species', species);
+        }
+
+        const body = document.getElementById('annotationModalBody');
+        document.getElementById('annotationModalLabel').innerText = `Annotation: ${geneId}`;
+        body.innerHTML = '<div class="text-center text-muted">Loading annotation...</div>';
+        const annotationModal = new bootstrap.Modal(document.getElementById('annotationModal'));
+        annotationModal.show();
+
+        try {
+            const response = await fetch(`/api/gene_annotation/?${params.toString()}`);
+            if (!response.ok) {
+                const error = await response.json().catch(() => null);
+                body.innerHTML = `<div class="alert alert-danger">Unable to load annotation${error && error.error ? ': ' + error.error : '.'}</div>`;
+                return;
+            }
+            const data = await response.json();
+            body.innerHTML = renderAnnotationHtml(data);
+        } catch (err) {
+            body.innerHTML = `<div class="alert alert-danger">Unable to load annotation: ${err.message}</div>`;
+        }
+    }
+
+    function renderAnnotationHtml(data) {
+        const sections = [];
+        const geneId = data.gene_id || 'Unknown';
+        const species = data.species || 'Unknown';
+        const taxonomyId = data.taxonomy_id || 'Unknown';
+
+        sections.push(`<p><strong>Gene:</strong> ${geneId}</p><p><strong>Species:</strong> ${species}</p><p><strong>Taxonomy ID:</strong> ${taxonomyId}</p>`);
+
+        if (data.eggnog && data.eggnog.rows && data.eggnog.rows.length) {
+            sections.push('<h5>EggNOG annotation</h5>');
+            const header = data.eggnog.header || [];
+            if (header.length) {
+                sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.eggnog.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            } else {
+                sections.push('<pre>' + data.eggnog.rows.map(row => row.join('\t')).join('\n') + '</pre>');
+            }
+            if (data.eggnog.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.eggnog.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No EggNOG annotation rows found.</div>');
+        }
+
+        if (data.interpro && data.interpro.rows && data.interpro.rows.length) {
+            sections.push('<h5>InterProScan annotation</h5>');
+            const header = data.interpro.header || [];
+            sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.interpro.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            if (data.interpro.member_dbs && data.interpro.member_dbs.length) {
+                sections.push(`<div class="text-muted small mb-3">Member DBs: ${data.interpro.member_dbs.join(', ')}</div>`);
+            }
+            if (data.interpro.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.interpro.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No InterProScan annotation rows found.</div>');
+        }
+
+        return sections.join('');
+    }
+
+    function escapeCsv(value) {
+        if (value == null) {
+            return '';
+        }
+        const stringValue = String(value).replace(/"/g, '""');
+        return '"' + stringValue + '"';
+    }
+
+    function downloadResults() {
+        if (!blastResults.length) {
+            alert('No BLAST results available to download.');
+            return;
+        }
+        const csvLines = ['Query,Subject,Gene Family,Species,Taxonomy ID,Identity,Length,Mismatch,Gap Open,Q-range,S-range,E-value,Bit Score,Subject Sequence'];
+        blastResults.forEach(item => {
+            const qstart = item.qstart || '';
+            const qend = item.qend || '';
+            const sstart = item.sstart || '';
+            const send = item.send || '';
+            const qrange = qstart && qend ? `${qstart}-${qend}` : '';
+            const srange = sstart && send ? `${sstart}-${send}` : '';
+            csvLines.push([
+                escapeCsv(item.query || ''),
+                escapeCsv(item.subject || ''),
+                escapeCsv(item.gene_family_display || ''),
+                escapeCsv(item.species || ''),
+                escapeCsv(item.taxonomy_id || ''),
+                escapeCsv(item.pident || ''),
+                escapeCsv(item.length || ''),
+                escapeCsv(item.mismatch || ''),
+                escapeCsv(item.gapopen || ''),
+                escapeCsv(qrange),
+                escapeCsv(srange),
+                escapeCsv(item.evalue || ''),
+                escapeCsv(item.bitscore || ''),
+                escapeCsv(item.subject_sequence || ''),
+            ].join(','));
+        });
+        const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'blast_results.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function updateProgramHint() {
+        const hints = {
+            blastn: 'blastn uses nucleotide queries against nucleotide databases.',
+            blastp: 'blastp uses protein queries against protein databases.',
+            blastx: 'blastx translates nucleotide queries into protein and searches protein databases.',
+            tblastn: 'tblastn searches translated nucleotide databases using protein queries.',
+            tblastx: 'tblastx translates both query and database nucleotide sequences.',
+        };
+        const program = document.getElementById('programSelect').value;
+        document.getElementById('programHint').innerText = hints[program] || '';
+    }
+
+    function updateDatabaseOptions() {
+        const program = document.getElementById('programSelect').value;
+        const select = document.getElementById('databaseSelect');
+        const options = programDatabaseOptions[program] || [];
+        select.innerHTML = '';
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            select.appendChild(option);
+        });
+    }
+
+    async function pollBlastJob(jobId) {
+        try {
+            const response = await fetch(`/api/blast_status/${encodeURIComponent(jobId)}/`);
+            const data = await response.json();
+            displayBlastJobInfo(data);
+            if (data.status === 'pending' || data.status === 'running') {
+                setTimeout(() => pollBlastJob(jobId), 2000);
+                return;
+            }
+            document.getElementById('btnText').innerText = 'Run Private BLAST';
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('runBlastBtn').disabled = false;
+            if (data.status === 'success') {
+                blastResults = data.results || [];
+                currentPage = 1;
+                renderBlastResults();
+                document.getElementById('resultSection').style.display = 'block';
+            } else if (data.status === 'error') {
+                alert(data.message || 'BLAST job failed.');
+            } else {
+                alert('Unexpected BLAST job status.');
+            }
+        } catch (error) {
+            document.getElementById('btnText').innerText = 'Run Private BLAST';
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('runBlastBtn').disabled = false;
+            alert('Failed to query BLAST status: ' + error.message);
+        }
+    }
+
+    async function runBlast() {
+        const sequenceText = document.getElementById('sequenceInput').value.trim();
+        const program = document.getElementById('programSelect').value;
+        const database = document.getElementById('databaseSelect').value;
+        const evalue = document.getElementById('evalueInput').value.trim() || '1e-5';
+        const maxTargetSeqs = document.getElementById('maxTargetInput').value || '10';
+        const emailAddress = document.getElementById('blastEmailInput').value.trim();
+
+        let sequence = sequenceText;
+        const uploadedText = await readUploadedFile();
+        if (uploadedText) {
+            sequence = uploadedText.trim();
+        }
+
+        if (!sequence) {
+            alert('Please provide a query sequence or upload a FASTA file.');
+            return;
+        }
+
+        if (!validateQueryType(program, sequence)) {
+            return;
+        }
+
+        document.getElementById('btnText').innerText = 'Aligning, please wait...';
+        document.getElementById('loadingSpinner').style.display = 'inline-block';
+        document.getElementById('resultSection').style.display = 'none';
+        document.getElementById('runBlastBtn').disabled = true;
+
+        try {
+            const response = await fetch('/api/run_blast/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sequence,
+                    program,
+                    database,
+                    evalue,
+                    max_target_seqs: maxTargetSeqs,
+                    email: emailAddress,
+                })
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const text = await response.text();
+            const data = contentType.includes('application/json') ? JSON.parse(text) : null;
+            if (!data) {
+                throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}\n${text}`);
+            }
+
+            if (data.status === 'pending' && data.job_id) {
+                displayBlastJobInfo({job_url: data.job_url, status: 'pending'});
+                pollBlastJob(data.job_id);
+            } else if (data.status === 'success') {
+                displayBlastJobInfo({job_url: data.job_url, status: 'success'});
+                document.getElementById('btnText').innerText = 'Run Private BLAST';
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('runBlastBtn').disabled = false;
+                blastResults = data.results || [];
+                currentPage = 1;
+                renderBlastResults();
+                document.getElementById('resultSection').style.display = 'block';
+            } else {
+                throw new Error(data.message || 'BLAST failed.');
+            }
+        } catch (error) {
+            alert('BLAST request failed: ' + error.message);
+            document.getElementById('btnText').innerText = 'Run Private BLAST';
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('runBlastBtn').disabled = false;
+        }
+    }
+
+    document.getElementById('runBlastBtn').addEventListener('click', runBlast);
+    document.getElementById('pageSizeSelect').addEventListener('change', () => {
+        currentPage = 1;
+        renderBlastResults();
+    });
+    document.getElementById('prevPageBtn').addEventListener('click', () => {
+        currentPage = Math.max(1, currentPage - 1);
+        renderBlastResults();
+    });
+    document.getElementById('nextPageBtn').addEventListener('click', () => {
+        currentPage += 1;
+        renderBlastResults();
+    });
+    document.getElementById('downloadResultsBtn').addEventListener('click', downloadResults);
+    updateProgramHint();
+    updateDatabaseOptions();
+    const initialJobId = getQueryParam('job_id');
+    if (initialJobId) {
+        displayBlastJobInfo({job_url: window.location.href, status: 'pending'});
+        pollBlastJob(initialJobId);
+    }
+</script>
+{% endblock %}

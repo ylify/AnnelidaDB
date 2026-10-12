@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% block title %}Gene Family - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Gene Family</h2>
+        <p class="lead text-white-50">Browse representative gene families and their member counts across sample species.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-0">Gene Family List</h4>
+                        <p class="mb-0 text-muted">Example gene family summary data for the new Gene Family module.</p>
+                    </div>
+                    <a href="/tools/" class="btn btn-outline-secondary">Back to Tools</a>
+                </div>
+                <div class="table-responsive">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="geneFamilySource" class="mb-0 fw-semibold">Source:</label>
+                            <select id="geneFamilySource" class="form-select form-select-sm" style="width:auto;" onchange="onGeneFamilySourceChange()">
+                                {% for option in source_options %}
+                                    <option value="{{ option.value }}" {% if option.value == selected_source %}selected{% endif %}>{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label for="familyPageSizeSelect" class="mb-0 fw-semibold">Rows per page:</label>
+                            <select id="familyPageSizeSelect" class="form-select form-select-sm" style="width:auto;">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="familyPrevPageBtn" disabled>Previous</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="familyNextPageBtn" disabled>Next</button>
+                            <span id="familyPageInfo" class="text-muted">Loading preview...</span>
+                        </div>
+                    </div>
+                    <div id="familyLoadingIndicator" class="alert alert-info text-center mb-3" style="display:none;">
+                        Loading all gene family rows, please wait...
+                    </div>
+                    <table class="table table-hover table-bordered align-middle mb-0 text-nowrap">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">Family ID</th>
+                                <th scope="col">Source</th>
+                                <th scope="col">Representative Gene</th>
+                                <th scope="col">Species</th>
+                                <th scope="col">Members</th>
+                                <th scope="col">Presented Species</th>
+                            </tr>
+                        </thead>
+                        <tbody id="familyTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="modal fade" id="annotationModal" tabindex="-1" aria-labelledby="annotationModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="annotationModalLabel">Gene Annotation</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" id="annotationModalBody">
+                                <div class="text-center text-muted">Select a gene to load annotation.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    async function showGeneAnnotationBySpecies(species, geneId, taxonomyId) {
+        if (!geneId) {
+            alert('Missing gene ID for annotation lookup.');
+            return;
+        }
+        const params = new URLSearchParams({ gene_id: geneId, species });
+        if (taxonomyId) {
+            params.set('taxonomy_id', taxonomyId);
+        }
+        const body = document.getElementById('annotationModalBody');
+        document.getElementById('annotationModalLabel').innerText = `Annotation: ${geneId}`;
+        body.innerHTML = '<div class="text-center text-muted">Loading annotation...</div>';
+        const annotationModal = new bootstrap.Modal(document.getElementById('annotationModal'));
+        annotationModal.show();
+
+        try {
+            const response = await fetch(`/api/gene_annotation/?${params.toString()}`);
+            if (!response.ok) {
+                const error = await response.json().catch(() => null);
+                body.innerHTML = `<div class="alert alert-danger">Unable to load annotation${error && error.error ? ': ' + error.error : '.'}</div>`;
+                return;
+            }
+            const data = await response.json();
+            body.innerHTML = renderAnnotationHtml(data);
+        } catch (err) {
+            body.innerHTML = `<div class="alert alert-danger">Unable to load annotation: ${err.message}</div>`;
+        }
+    }
+
+    function onGeneFamilySourceChange() {
+        const select = document.getElementById('geneFamilySource');
+        if (!select) {
+            return;
+        }
+        const source = select.value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('source', source);
+        window.location.href = url.toString();
+    }
+
+    let geneFamilyData = [
+        {% for family in families %}
+        {
+            family_id: '{{ family.family_id|escapejs }}',
+            source: '{{ family.source|escapejs }}',
+            representative_gene: '{{ family.representative_gene|escapejs }}',
+            species: '{{ family.species|escapejs }}',
+            taxonomy_id: '{{ family.taxonomy_id|default_if_none:''|escapejs }}',
+            member_count: '{{ family.member_count }}',
+            presented_species: '{{ family.presented_species|default:'0 species'|escapejs }}',
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const geneFamilyApiUrl = '{{ gene_family_api_url }}';
+    const geneFamilyPreviewLimit = {{ gene_family_preview_limit }};
+    let currentFamilyPage = 1;
+
+    function getFamilyPageSize() {
+        return parseInt(document.getElementById('familyPageSizeSelect').value, 10) || 25;
+    }
+
+    function updateFamilyPageInfo() {
+        const pageSize = getFamilyPageSize();
+        const totalRows = geneFamilyData.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        document.getElementById('familyPageInfo').innerText = `Showing page ${currentFamilyPage} of ${totalPages} (${totalRows} families)`;
+    }
+
+    function updateFamilyPaginationControls() {
+        const totalRows = geneFamilyData.length;
+        const pageSize = getFamilyPageSize();
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        document.getElementById('familyPrevPageBtn').disabled = currentFamilyPage <= 1 || totalRows === 0;
+        document.getElementById('familyNextPageBtn').disabled = currentFamilyPage >= totalPages || totalRows === 0;
+    }
+
+    function renderFamilyResults() {
+        const tbody = document.getElementById('familyTableBody');
+        const pageSize = getFamilyPageSize();
+        const totalRows = geneFamilyData.length;
+        const startIndex = (currentFamilyPage - 1) * pageSize;
+        const pageItems = geneFamilyData.slice(startIndex, startIndex + pageSize);
+
+        tbody.innerHTML = '';
+        if (!pageItems.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No gene families to display.</td></tr>';
+            updateFamilyPageInfo();
+            updateFamilyPaginationControls();
+            return;
+        }
+
+        pageItems.forEach((item) => {
+            const row = document.createElement('tr');
+            const geneId = item.representative_gene;
+            const geneUrl = item.taxonomy_id ? `/species/${encodeURIComponent(item.taxonomy_id)}/gene/${encodeURIComponent(geneId)}/` : `/gene/${encodeURIComponent(geneId)}/`;
+            const annotationOnclick = `showGeneAnnotationBySpecies('${item.species.replace(/'/g, "\\'")}','${item.representative_gene.replace(/'/g, "\\'")}', '${item.taxonomy_id.replace(/'/g, "\\'")}')`;
+            const familyDetailUrl = `/gene-family/${encodeURIComponent(item.family_id)}/?source=${encodeURIComponent(item.source)}`;
+            const familyIdLink = `<a href="${familyDetailUrl}" class="text-decoration-none fw-semibold">${item.family_id}</a>`;
+            const geneCell = `
+                <div class="d-flex flex-column gap-2">
+                    <a href="${geneUrl}" target="_blank" class="text-decoration-none fw-semibold">${geneId}</a>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="${annotationOnclick}">Annotation</button>
+                </div>`;
+            row.innerHTML = `
+                <td>${familyIdLink}</td>
+                <td>${item.source}</td>
+                <td>${geneCell}</td>
+                <td>${item.species}</td>
+                <td>${item.member_count}</td>
+                <td>${item.presented_species}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        updateFamilyPageInfo();
+        updateFamilyPaginationControls();
+    }
+
+    function goToFamilyPage(offset) {
+        const pageSize = getFamilyPageSize();
+        const totalPages = Math.max(1, Math.ceil(geneFamilyData.length / pageSize));
+        currentFamilyPage = Math.min(Math.max(1, currentFamilyPage + offset), totalPages);
+        renderFamilyResults();
+    }
+
+    async function fetchFullGeneFamilyData() {
+        const indicator = document.getElementById('familyLoadingIndicator');
+        indicator.style.display = 'block';
+        indicator.className = 'alert alert-info text-center mb-3';
+        indicator.innerHTML = 'Loading all gene family rows, please wait...';
+
+        try {
+            const url = new URL(geneFamilyApiUrl, window.location.origin);
+            url.searchParams.set('source', document.getElementById('geneFamilySource').value);
+            const response = await fetch(url.toString());
+            if (!response.ok) {
+                throw new Error('Unable to fetch gene family data.');
+            }
+            const data = await response.json();
+            if (data.status !== 'success' || !Array.isArray(data.families)) {
+                throw new Error('Invalid gene family data returned from server.');
+            }
+            geneFamilyData = data.families;
+            currentFamilyPage = 1;
+            renderFamilyResults();
+        } catch (err) {
+            indicator.className = 'alert alert-danger text-center mb-3';
+            indicator.innerHTML = `Failed to load full data: ${err.message}`;
+            return;
+        }
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const pageSizeSelect = document.getElementById('familyPageSizeSelect');
+        const prevBtn = document.getElementById('familyPrevPageBtn');
+        const nextBtn = document.getElementById('familyNextPageBtn');
+
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', () => {
+                currentFamilyPage = 1;
+                renderFamilyResults();
+            });
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => goToFamilyPage(-1));
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => goToFamilyPage(1));
+        }
+
+        renderFamilyResults();
+        setTimeout(fetchFullGeneFamilyData, 100);
+    });
+
+    function renderAnnotationHtml(data) {
+        const sections = [];
+        const geneId = data.gene_id || 'Unknown';
+        const species = data.species || 'Unknown';
+        const taxonomyId = data.taxonomy_id || 'Unknown';
+
+        sections.push(`<p><strong>Gene:</strong> ${geneId}</p><p><strong>Species:</strong> ${species}</p><p><strong>Taxonomy ID:</strong> ${taxonomyId}</p>`);
+
+        if (data.eggnog && data.eggnog.rows && data.eggnog.rows.length) {
+            sections.push('<h5>EggNOG annotation</h5>');
+            const header = data.eggnog.header || [];
+            if (header.length) {
+                sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.eggnog.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            } else {
+                sections.push('<pre>' + data.eggnog.rows.map(row => row.join('\t')).join('\n') + '</pre>');
+            }
+            if (data.eggnog.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.eggnog.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No EggNOG annotation rows found.</div>');
+        }
+
+        if (data.interpro && data.interpro.rows && data.interpro.rows.length) {
+            sections.push('<h5>InterProScan annotation</h5>');
+            const header = data.interpro.header || [];
+            sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.interpro.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            if (data.interpro.member_dbs && data.interpro.member_dbs.length) {
+                sections.push(`<div class="text-muted small mb-3">Member DBs: ${data.interpro.member_dbs.join(', ')}</div>`);
+            }
+            if (data.interpro.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.interpro.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No InterProScan annotation rows found.</div>');
+        }
+
+        return sections.join('');
+    }
+</script>
+{% endblock %}

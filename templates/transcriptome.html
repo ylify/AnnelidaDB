@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% block title %}Transcriptome - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Transcriptome Hub</h2>
+        <p class="lead text-white-75">Browse transcriptome datasets, explore RNA expression resources, and preview sample metadata.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4 mb-4">
+        <div class="row gy-4 page-summary-row">
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-info h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">SRA Runs</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.runs }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-primary h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Studies</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.studies }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-success h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Species</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.species }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-4 border border-2 border-warning h-100 page-summary-card">
+                    <h6 class="text-uppercase text-muted mb-2">Tissue Types</h6>
+                    <p class="display-6 fw-bold mb-0">{{ summary.tissues }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-section p-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="h5 fw-bold mb-1">NCBI SRA Transcriptome Results</h2>
+                {% if source == 'webenv' and source_note %}
+                <p class="text-muted mb-0">Showing transcriptome metadata loaded from NCBI WebEnv query. {{ source_note }}</p>
+                {% elif selected_taxonomy %}
+                <p class="text-muted mb-0">Showing cached SRA run metadata for {{ selected_taxonomy.species }} (taxonomy ID {{ selected_taxid }}).</p>
+                {% elif selected_taxid %}
+                <p class="text-muted mb-0">Showing cached SRA run metadata filtered by taxonomy ID {{ selected_taxid }}.</p>
+                {% else %}
+                <p class="text-muted mb-0">Showing cached SRA run metadata for Annelida (taxonomy ID 6340).</p>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button id="downloadTranscriptomeBtn" class="btn btn-primary">Export Selected</button>
+                <button id="exportTranscriptomeBtn" class="btn btn-outline-success">Export Current Results</button>
+                <a href="#" class="btn btn-outline-primary">Request Full Dataset Access</a>
+            </div>
+        </div>
+        {% include '_taxonomy_display_toggle.html' %}
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text">Run</span>
+                    <select id="studyFilter" class="form-select">
+                        <option value="">All Runs</option>
+                        {% for study in study_values %}
+                        <option value="{{ study|escape }}">{{ study|escape }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text">Accession</span>
+                    <input id="runFilter" class="form-control" type="search" placeholder="Filter by accession" aria-label="Accession filter">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text">Platform</span>
+                    <select id="platformFilter" class="form-select">
+                        <option value="">All Platforms</option>
+                        {% for platform in platform_values %}
+                        <option value="{{ platform|escape }}">{{ platform|escape }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text">Library Layout</span>
+                    <select id="layoutFilter" class="form-select">
+                        <option value="">All Layouts</option>
+                        {% for layout in layout_values %}
+                        <option value="{{ layout|escape }}">{{ layout|escape }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table id="transcriptomeTable" class="table table-striped table-hover align-middle w-100">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center" style="width: 1%;"><input type="checkbox" id="selectAllTranscriptome"></th>
+                        <th>Accession</th>
+                        <th>Run</th>
+                        <th class="taxonomy-source-ncbi">Class</th>
+                        <th class="taxonomy-source-ncbi">Order</th>
+                        <th class="taxonomy-source-ncbi">Family</th>
+                        <th class="taxonomy-source-updated">Updated Clade 6</th>
+                        <th class="taxonomy-source-updated">Updated Clade 5</th>
+                        <th class="taxonomy-source-updated">Updated Clade 4</th>
+                        <th class="taxonomy-source-updated">Updated Clade 3</th>
+                        <th class="taxonomy-source-updated">Updated Clade 2</th>
+                        <th class="taxonomy-source-updated">Updated Clade 1</th>
+                        <th>Species</th>
+                        <th>Tissue</th>
+                        <th>Development Stage</th>
+                        <th>Platform</th>
+                        <th>Library Layout</th>
+                        <th>Spots</th>
+                        <th>Bases</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <form id="transcriptomeDownloadForm" method="post" action="/download/" class="d-none">
+            {% csrf_token %}
+            <input type="hidden" name="data_type" value="transcriptome">
+            <div id="transcriptomeDownloadInputs"></div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    $(document).ready(function() {
+        var table = $('#transcriptomeTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '{% url "transcriptome_data" %}',
+                type: 'POST',
+                data: function(d) {
+                    d.csrfmiddlewaretoken = '{{ csrf_token }}';
+                    d.taxid = '{{ selected_taxid|default:"" }}';
+                },
+                error: function(xhr) {
+                    var detail = xhr.responseJSON && (xhr.responseJSON.error || xhr.responseJSON.message);
+                    console.error('Transcriptome data request failed:', xhr.status, detail || xhr.responseText);
+                }
+            },
+            pageLength: 10,
+            order: [[1, 'asc']],
+            deferRender: true,
+            language: {
+                search: 'Search:',
+                lengthMenu: 'Rows per page _MENU_',
+                info: 'Showing _START_ to _END_ of _TOTAL_ entries'
+            },
+            columns: [
+                { orderable: false, searchable: false },
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+            ]
+        });
+        initTaxonomyDisplayToggle('#transcriptomeTable', table);
+
+        $('#selectAllTranscriptome').on('change', function() {
+            $('.download-checkbox[data-group="transcriptome"]').prop('checked', $(this).is(':checked'));
+        });
+
+        $('#studyFilter').on('change', function() {
+            var value = $(this).val();
+            table.column(2).search(value ? '^' + $.fn.dataTable.util.escapeRegex(value) + '$' : '', true, false).draw();
+        });
+
+        $('#runFilter').on('input', function() {
+            var value = $(this).val();
+            table.column(1).search(value ? $.fn.dataTable.util.escapeRegex(value) : '', true, false).draw();
+        });
+
+        $('#platformFilter').on('change', function() {
+            var value = $(this).val();
+            table.column(15).search(value ? '^' + $.fn.dataTable.util.escapeRegex(value) + '$' : '', true, false).draw();
+        });
+
+        $('#layoutFilter').on('change', function() {
+            var value = $(this).val();
+            table.column(16).search(value ? '^' + $.fn.dataTable.util.escapeRegex(value) + '$' : '', true, false).draw();
+        });
+
+        $('#downloadTranscriptomeBtn').on('click', function(e) {
+            e.preventDefault();
+            downloadSelectedTableRowsAsCsv(table, 'Transcriptome.selected.csv');
+        });
+
+        $('#exportTranscriptomeBtn').on('click', function() {
+            var headers = ['Accession', 'Run', 'Class', 'Order', 'Family', 'Updated Clade 6', 'Updated Clade 5', 'Updated Clade 4', 'Updated Clade 3', 'Updated Clade 2', 'Updated Clade 1', 'Species', 'Tissue', 'Development Stage', 'Platform', 'Library Layout', 'Spots', 'Bases'];
+            var csvRows = [headers.join(',')];
+            table.rows({ filter: 'applied', order: 'applied' }).every(function() {
+                var data = this.data();
+                var row = [
+                    $(data[1]).text() || data[1],
+                    $(data[2]).text() || data[2],
+                    data[3],
+                    data[4],
+                    data[5],
+                    data[6],
+                    data[7],
+                    data[8],
+                    data[9],
+                    data[10],
+                    data[11],
+                    $(data[12]).text() || data[12],
+                    data[13],
+                    data[14],
+                    data[15],
+                    data[16],
+                    data[17],
+                    data[18]
+                ];
+                csvRows.push(row.map(function(cell) {
+                    var text = String(cell || '').replace(/"/g, '""');
+                    return '"' + text + '"';
+                }).join(','));
+            });
+            var csvContent = csvRows.join('\n');
+            var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            var url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'transcriptome_current_results.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    });
+</script>
+{% endblock %}

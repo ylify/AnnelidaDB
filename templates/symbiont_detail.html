@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title|default:"Symbiont Detail" }} - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="dashboard-section p-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+            <div>
+                <h1 class="h3 fw-bold mb-2">{{ tax.species }}</h1>
+                <p class="text-secondary mb-0">Host NCBI Taxonomy ID: <strong>{{ tax.ncbi_taxonomy_id }}</strong></p>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                <a href="/symbiont/" class="btn btn-outline-info btn-sm"><i class="fas fa-arrow-left me-2"></i>Back to Symbionts</a>
+                <a href="{% url 'species_detail' tax.ncbi_taxonomy_id|default:tax.species %}" class="btn btn-outline-secondary btn-sm">Explore the species</a>
+            </div>
+        </div>
+    </div>
+    <div class="row g-4 align-items-stretch">
+        <div class="col-lg-6">
+            <div class="dashboard-section p-4 border-start border-info border-4 flex-column h-100">
+                <h2 class="h5 fw-bold mb-3">General Information</h2>
+                <div class="table-responsive">
+                    {% if symbionts %}
+                        {% for sym in symbionts %}
+                        <table class="table table-sm table-hover table-custom mb-4 rounded shadow-sm bg-white">
+                            <tbody>
+                                <tr class="table-light"><td colspan="2" class="fw-bold text-primary">{{ sym.species|default:'Unknown Symbiont' }} — <span class="text-muted fst-italic">{{ sym.symbiont_type|default:'Unknown Type' }}</span></td></tr>
+                                <tr><td class="text-muted w-50">Completeness</td><td>{{ sym.completeness|default:'-' }}%</td></tr>
+                                <tr><td class="text-muted">Contamination</td><td class="text-danger">{{ sym.contamination|default:'-' }}%</td></tr>
+                                <tr><td class="text-muted">Size</td><td>{{ sym.size_bp|default:'-' }} bp</td></tr>
+                                <tr><td class="text-muted">Contigs</td><td>{{ sym.contigs|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">N50</td><td>{{ sym.n50_bp|default:'-' }} bp</td></tr>
+                                <tr><td class="text-muted">Genes</td><td>{{ sym.genes|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Domain</td><td>{{ sym.domain|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Phylum</td><td>{{ sym.phylum|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Class</td><td>{{ sym.class_name|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Order</td><td>{{ sym.order|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Family</td><td>{{ sym.family|default:'-' }}</td></tr>
+                                <tr><td class="text-muted">Genus</td><td class="fst-italic">{{ sym.genus|default:'-' }}</td></tr>
+                            </tbody>
+                        </table>
+                        {% endfor %}
+                    {% else %}
+                    <div class="text-center py-5 text-muted">No General Information found for this host.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="dashboard-section p-4 border-start border-success border-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Circos Plot</h2>
+                    <span class="badge bg-light text-dark border"><i class="fas fa-chart-pie me-1"></i>BakTa</span>
+                </div>
+                <div class="bg-light rounded-4 p-3 text-center">
+                    {% if circos_url %}
+                    <img src="{{ circos_url }}" alt="Circos Plot" class="img-fluid rounded shadow-sm" style="max-height: 520px; object-fit: contain;">
+                    {% else %}
+                    <div class="py-5 text-muted fst-italic">Circos plot file was not found.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="dashboard-section p-4 border-start border-warning border-4">
+                <h2 class="h5 fw-bold mb-3">Annotation Summary</h2>
+                {% if summary2_table %}
+                <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover table-striped table-bordered text-center align-middle mb-0" style="font-size: 0.85rem; white-space: nowrap;">
+                        <thead class="table-dark position-sticky top-0"><tr>{% for header in summary2_table.0 %}<th class="fw-bold px-3 py-2">{{ header }}</th>{% endfor %}</tr></thead>
+                        <tbody>{% for row in summary2_table|slice:'1:' %}<tr>{% for cell in row %}<td class="px-3 py-2">{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+                {% elif summary2_one_line %}
+                <div class="alert alert-light">{{ summary2_one_line }}</div>
+                {% else %}
+                <div class="alert alert-secondary">summary.2.txt file was not found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="dashboard-section p-4 border-start border-primary border-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+                    <div>
+                        <h2 class="h5 fw-bold mb-3">Downloads</h2>
+                        <p class="text-muted mb-0">Select files and add them to the Download Bar for a combined archive.</p>
+                    </div>
+                    <div class="form-check form-switch mt-2 mt-md-0">
+                        <input class="form-check-input" type="checkbox" id="downloadSymbiontSelectAll">
+                        <label class="form-check-label" for="downloadSymbiontSelectAll">Select all</label>
+                    </div>
+                    <button type="button" id="downloadSymbiontFilesBtn" class="btn btn-primary">Add Selected Files to Download Bar</button>
+                </div>
+                {% if downloads %}
+                <div class="row g-3">
+                    {% for item in downloads %}
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <div class="card shadow-sm">
+                            <div class="card-body p-3">
+                                <div class="form-check">
+                                    <input class="form-check-input download-file-checkbox" type="checkbox" id="symbiontDownloadCheckbox{{ forloop.counter }}" data-file-path="{{ item.path }}" data-file-label="{{ item.label }}">
+                                    <label class="form-check-label fw-semibold ms-2" for="symbiontDownloadCheckbox{{ forloop.counter }}">{{ item.label }}</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-secondary">No SOB download files found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function collectSelectedSymbiontFiles() {
+        var selectedItems = [];
+        document.querySelectorAll('.download-file-checkbox:checked').forEach(function(checkbox) {
+            var filePath = checkbox.dataset.filePath;
+            var fileLabel = checkbox.dataset.fileLabel || '';
+            if (filePath) {
+                selectedItems.push({ id: filePath, label: fileLabel || filePath });
+            }
+        });
+        return selectedItems;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var downloadSymbiontFilesBtn = document.getElementById('downloadSymbiontFilesBtn');
+        if (downloadSymbiontFilesBtn) {
+            downloadSymbiontFilesBtn.addEventListener('click', function() {
+                var selectedItems = collectSelectedSymbiontFiles();
+                if (!selectedItems.length) {
+                    alert('Please select at least one file to add to the download bar.');
+                    return;
+                }
+                downloadCartAddSelectedFiles('selected_files_{{ tax.ncbi_taxonomy_id }}', '{{ tax.species }} Symbiont Files', selectedItems);
+            });
+        }
+
+        var selectAllCheckbox = document.getElementById('downloadSymbiontSelectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                document.querySelectorAll('.download-file-checkbox').forEach(function(checkbox) {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

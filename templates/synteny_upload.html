@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% block title %}Synteny Upload - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Synteny Upload</h2>
+        <p class="lead text-white-75">Submit private `.pep` and `.bed` files and compare them against Annelida linkage groups.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="dashboard-section shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3"><i class="fas fa-upload text-secondary me-2"></i>Upload private synteny data</h5>
+                    <p class="text-secondary">Upload any valid `.pep` and `.bed` files. The server preserves the original filenames, runs the background comparison, and also creates sanitized internal files based on the species name you enter.</p>
+                    {% if upload_error %}
+                    <div class="alert alert-danger">{{ upload_error }}</div>
+                    {% endif %}
+                    {% if upload_info %}
+                        <div class="mb-3">
+                            {% if upload_info.species %}
+                            <p class="mb-1"><strong>Species:</strong> {{ upload_info.species|escape }}</p>
+                            {% endif %}
+                            {% if upload_info.uploaded_files %}
+                            <p class="mb-1"><strong>Original uploaded files:</strong> {{ upload_info.uploaded_files|join:", " }}</p>
+                            {% endif %}
+                            {% if upload_info.renamed_files %}
+                            <p class="mb-0"><strong>Internal renamed files:</strong> {{ upload_info.renamed_files|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                        {% if upload_info.status == 'running' %}
+                        <div class="alert alert-warning">
+                            <p class="mb-2"><strong>Job submitted.</strong> Synteny comparison is running.</p>
+                            <p class="mb-1">Check progress or return later at:</p>
+                            <p class="mb-1"><a href="{{ upload_info.page_url }}" target="_blank">{{ upload_info.page_url }}</a></p>
+                            <p class="mb-1 text-muted"><strong>Please save this link.</strong> It is required to return to this job status.</p>
+                            <div class="mt-3 d-flex flex-wrap gap-2">
+                                <button id="refresh-status-button" type="button" class="btn btn-sm btn-outline-secondary">Refresh status</button>
+                                <span id="refresh-message" class="text-muted align-self-center">Auto-refresh in 30s</span>
+                            </div>
+                        </div>
+                        {% elif upload_info.status == 'finished' %}
+                        <div class="alert alert-success">
+                            <p class="mb-2"><strong>Processing complete.</strong> Results are ready.</p>
+                            <p class="mb-1">Please keep the link below if you want to revisit this result later:</p>
+                            <p class="mb-1"><a href="{{ upload_info.page_url }}" target="_blank">{{ upload_info.page_url }}</a></p>
+                        </div>
+                        {% elif upload_info.status == 'failed' %}
+                        <div class="alert alert-danger">
+                            <p class="mb-2"><strong>Task failed.</strong> Check the log file for details.</p>
+                            <p class="mb-1"><a href="{{ upload_info.base_url }}run.log" target="_blank">run.log</a></p>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <p class="mb-2"><strong>Task status:</strong> {{ upload_info.status }}</p>
+                            <p class="mb-1">You can return later at:</p>
+                            <p class="mb-1"><a href="{{ upload_info.page_url }}" target="_blank">{{ upload_info.page_url }}</a></p>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    <form method="post" enctype="multipart/form-data" action="/synteny-upload/">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="species" class="form-label">Species name</label>
+                                <input id="species" name="species" class="form-control" type="text" value="{{ species_raw|default_if_none:'' }}" placeholder="Enter species name to sanitize into filenames" required>
+                                <div class="form-text">Spaces in the species name will be replaced with underscores to create internal file names.</div>
+                            </div>
+                            <div class="col-12">
+                                <label for="email" class="form-label">Email address (optional)</label>
+                                <input id="email" name="email" class="form-control" type="email" placeholder="user@example.com">
+                                <div class="form-text">Enter your email to receive the job link for later access.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="species_pep" class="form-label">Upload .pep file</label>
+                                <input id="species_pep" name="species_pep" class="form-control" type="file" accept=".pep" required>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="species_bed" class="form-label">Upload .bed file</label>
+                                <input id="species_bed" name="species_bed" class="form-control" type="file" accept=".bed" required>
+                            </div>
+                        </div>
+                        <div class="mt-4 d-grid">
+                            <button type="submit" class="btn btn-warning">Submit and run synteny comparison</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if upload_info and upload_info.files %}
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="dashboard-section shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="card-title mb-1">Result files</h5>
+                            <p class="text-secondary mb-0">Download or preview files generated by this job.</p>
+                        </div>
+                        {% if upload_info.preview_name %}
+                        <span class="badge bg-success">Preview: {{ upload_info.preview_name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-1">PNG Preview</h5>
+                                <p class="text-secondary mb-0">Pick two PNGs to preview side by side. Use the selectors below to control each pane independently.</p>
+                            </div>
+                        </div>
+                        {% if upload_info.png_files %}
+                        <div class="row gy-4 mb-4">
+                            <div class="col-12 col-lg-6">
+                                <div class="mb-3">
+                                    <label for="pdf-preview-select-left" class="form-label small mb-1">Left preview</label>
+                                    <select id="pdf-preview-select-left" class="form-select form-select-sm">
+                                        {% for file in upload_info.png_files %}
+                                        <option value="{{ file.url }}" data-file-name="{{ file.name|escape }}" {% if forloop.first %}selected{% endif %}>{{ file.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="border rounded overflow-hidden p-2" style="min-height: 70vh; max-height: 75vh; background: #f8f9fa;">
+                                    <img id="pdf-preview-object-left" src="{{ upload_info.png_files.0.url }}" alt="Left preview" width="100%" height="100%" style="min-height: 70vh; max-height: 75vh; object-fit: contain; display: block;" />
+                                    <div class="mt-2 text-end">
+                                        <a id="pdf-preview-download-left" href="/synteny-upload/download-selected/?token={{ upload_info.token }}&file={{ upload_info.png_files.0.name|urlencode }}" download="{{ upload_info.png_files.0.name }}" class="btn btn-sm btn-outline-secondary">Download {{ upload_info.png_files.0.name }}</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <div class="mb-3">
+                                    <label for="pdf-preview-select-right" class="form-label small mb-1">Right preview</label>
+                                    <select id="pdf-preview-select-right" class="form-select form-select-sm">
+                                        {% for file in upload_info.png_files %}
+                                        <option value="{{ file.url }}" data-file-name="{{ file.name|escape }}" {% if forloop.counter == 2 %}selected{% endif %}>{{ file.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="border rounded overflow-hidden p-2" style="min-height: 70vh; max-height: 75vh; background: #f8f9fa;">
+                                    {% if upload_info.png_files|length > 1 %}
+                                    <img id="pdf-preview-object-right" src="{{ upload_info.png_files.1.url }}" alt="Right preview" width="100%" height="100%" style="min-height: 70vh; max-height: 75vh; object-fit: contain; display: block;" />
+                                    <div class="mt-2 text-end">
+                                        <a id="pdf-preview-download-right" href="/synteny-upload/download-selected/?token={{ upload_info.token }}&file={{ upload_info.png_files.1.name|urlencode }}" download="{{ upload_info.png_files.1.name }}" class="btn btn-sm btn-outline-secondary">Download {{ upload_info.png_files.1.name }}</a>
+                                    </div>
+                                    {% else %}
+                                    <div class="p-4 text-center text-muted">
+                                        No second PNG selected. Please choose another file from the selector.
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if upload_info.seqids_file_name %}
+                    <div class="mb-3">
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <span class="badge bg-info text-dark">SeqIDs file: {{ upload_info.seqids_file_name }}</span>
+                            <a href="{{ upload_info.seqids_edit_url }}" class="btn btn-sm btn-outline-secondary">Edit chromosome order</a>
+                        </div>
+                        <div class="text-muted small mt-2">Modify the seqids order and rerun the comparison to refresh the Oxford plot result.</div>
+                    </div>
+                    {% endif %}
+                    <form id="download-selected-form" method="post" action="/synteny-upload/download-selected/">
+                        {% csrf_token %}
+                        <input type="hidden" name="token" value="{{ upload_info.token }}">
+                        <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                            <button type="submit" class="btn btn-sm btn-warning">Download selected files</button>
+                            <span class="text-muted small">Select individual files below and click to download them together.</span>
+                        </div>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-borderless mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 3rem; text-align: center;"><input id="download-select-all" type="checkbox"></th>
+                                        <th>Name</th>
+                                        <th class="text-end">Download</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file in upload_info.files %}
+                                    <tr>
+                                        <td class="text-center"><input id="download-checkbox-{{ forloop.counter0 }}" type="checkbox" class="download-file-checkbox" name="file" value="{{ file.name|escape }}"></td>
+                                        <td><label for="download-checkbox-{{ forloop.counter0 }}" class="mb-0" style="cursor:pointer;">{{ file.name }}</label></td>
+                                        <td class="text-end"><a href="/synteny-upload/download-selected/?token={{ upload_info.token }}&file={{ file.name|urlencode }}" download="{{ file.name }}" class="btn btn-sm btn-outline-primary">Download</a></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const autoRefreshEnabled = {% if upload_info and upload_info.status == 'running' %}true{% else %}false{% endif %};
+    const refreshUrl = "{% if upload_info and upload_info.page_url %}{{ upload_info.page_url }}{% else %}{{ request.get_full_path|escapejs }}{% endif %}";
+    const refreshButton = document.getElementById('refresh-status-button');
+    const refreshMessage = document.getElementById('refresh-message');
+    const pdfSelectLeft = document.getElementById('pdf-preview-select-left');
+    const pdfPreviewObjectLeft = document.getElementById('pdf-preview-object-left');
+    const pdfDownloadLinkLeft = document.getElementById('pdf-preview-download-left');
+    const pdfSelectRight = document.getElementById('pdf-preview-select-right');
+    const pdfPreviewObjectRight = document.getElementById('pdf-preview-object-right');
+    const pdfDownloadLinkRight = document.getElementById('pdf-preview-download-right');
+    const syntenyUploadToken = "{{ upload_info.token }}";
+    const selectAllCheckbox = document.getElementById('download-select-all');
+    const fileCheckboxes = Array.from(document.querySelectorAll('.download-file-checkbox'));
+    const refreshIntervalMs = 30000;
+    let refreshCountdown = refreshIntervalMs / 1000;
+    let refreshTimer = null;
+
+    function updateRefreshMessage() {
+        if (refreshMessage) {
+            refreshMessage.textContent = `Auto-refresh in ${refreshCountdown}s`;
+        }
+    }
+
+    function startAutoRefresh() {
+        if (!autoRefreshEnabled || !refreshMessage) {
+            return;
+        }
+        updateRefreshMessage();
+        refreshTimer = setInterval(() => {
+            refreshCountdown -= 1;
+            if (refreshCountdown <= 0) {
+                window.location.href = refreshUrl;
+            } else {
+                updateRefreshMessage();
+            }
+        }, 1000);
+    }
+
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => {
+            window.location.href = refreshUrl;
+        });
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', () => {
+            fileCheckboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+
+    function setPreviewObject(pdfObject, url, downloadLink, fileName) {
+        if (!pdfObject || !url) {
+            return;
+        }
+        pdfObject.src = url;
+        if (downloadLink && fileName) {
+            downloadLink.href = `/synteny-upload/download-selected/?token=${encodeURIComponent(syntenyUploadToken)}&file=${encodeURIComponent(fileName)}`;
+            downloadLink.setAttribute('download', fileName);
+        } else if (downloadLink) {
+            downloadLink.href = url;
+        }
+    }
+
+    if (pdfSelectLeft && pdfPreviewObjectLeft) {
+        const leftFileName = pdfSelectLeft.options[pdfSelectLeft.selectedIndex]?.dataset?.fileName || pdfSelectLeft.options[pdfSelectLeft.selectedIndex]?.text;
+        setPreviewObject(pdfPreviewObjectLeft, pdfSelectLeft.value, pdfDownloadLinkLeft, leftFileName);
+        pdfSelectLeft.addEventListener('change', () => {
+            const selectedUrl = pdfSelectLeft.value;
+            const selectedName = pdfSelectLeft.options[pdfSelectLeft.selectedIndex]?.dataset?.fileName || pdfSelectLeft.options[pdfSelectLeft.selectedIndex]?.text;
+            setPreviewObject(pdfPreviewObjectLeft, selectedUrl, pdfDownloadLinkLeft, selectedName);
+            if (pdfDownloadLinkLeft) {
+                pdfDownloadLinkLeft.textContent = `Download ${selectedName}`;
+            }
+        });
+    }
+
+    if (pdfSelectRight && pdfPreviewObjectRight) {
+        const rightFileName = pdfSelectRight.options[pdfSelectRight.selectedIndex]?.dataset?.fileName || pdfSelectRight.options[pdfSelectRight.selectedIndex]?.text;
+        setPreviewObject(pdfPreviewObjectRight, pdfSelectRight.value, pdfDownloadLinkRight, rightFileName);
+        pdfSelectRight.addEventListener('change', () => {
+            const selectedUrl = pdfSelectRight.value;
+            const selectedName = pdfSelectRight.options[pdfSelectRight.selectedIndex]?.dataset?.fileName || pdfSelectRight.options[pdfSelectRight.selectedIndex]?.text;
+            setPreviewObject(pdfPreviewObjectRight, selectedUrl, pdfDownloadLinkRight, selectedName);
+            if (pdfDownloadLinkRight) {
+                pdfDownloadLinkRight.textContent = `Download ${selectedName}`;
+            }
+        });
+    }
+
+    if (autoRefreshEnabled) {
+        startAutoRefresh();
+    }
+</script>
+{% endblock %}

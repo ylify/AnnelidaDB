@@ -1,0 +1,552 @@
+{% extends 'base.html' %}
+{% block title %}Gene Detail - AnnelidaDB{% endblock %}
+{% block extra_head %}
+
+<style>
+    .locus-bar {
+        background: #f1f5f9;
+        border-radius: 12px;
+        position: relative;
+        height: 28px;
+        margin: 0.75rem 0;
+    }
+    .locus-bar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        border-radius: 12px;
+        background: linear-gradient(90deg, rgba(14,165,233,0.15), rgba(56,189,248,0.15));
+    }
+    .locus-highlight {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        background: rgba(59,130,246,0.8);
+        border-radius: 10px;
+    }
+    .sequence-box {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.92rem;
+        line-height: 1.35;
+    }
+    .annotation-table th {
+        width: 220px;
+        white-space: nowrap;
+    }
+    .jbrowse-frame {
+        width: 100%;
+        min-height: 560px;
+        border: 1px solid #d1d5db;
+        border-radius: 0.75rem;
+    }
+    .sequence-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        max-height: 420px;
+        overflow: auto;
+    }
+    .sequence-toggle {
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .annotation-collapsible {
+        display: inline;
+    }
+    .annotation-summary,
+    .annotation-full {
+        display: inline;
+    }
+    .annotation-full {
+        padding-left: 0.5rem;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Gene Detail</h2>
+        <p class="lead text-white-50">View functional annotation, sequence and genome location for gene <strong>{{ gene_id }}</strong>.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row gy-4">
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm p-4">
+                <div class="row gx-4 gy-3 align-items-center">
+                    <div class="col-md-8">
+                        <h3 class="mb-2">{{ gene_id }}</h3>
+                        <p class="mb-1"><strong>Species:</strong> <em>{{ tax.species }}</em></p>
+                        <p class="mb-1"><strong>NCBI Taxonomy ID:</strong> {{ tax.ncbi_taxonomy_id|default:"Unknown" }}</p>
+                        <p class="mb-0"><strong>Description:</strong> <span id="geneDescription">{{ annotation_description|default:"No description available." }}</span></p>
+                        <div id="geneDetailExtrasParams" data-url="{{ gene_detail_extras_url }}" data-gene-id="{{ gene_id }}" data-taxonomy-id="{{ tax.ncbi_taxonomy_id|default:'' }}" data-species="{{ tax.species|escapejs }}"></div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <a href="/genome/detail/{{ tax.ncbi_taxonomy_id|default:tax.species }}/" class="btn btn-outline-primary">Explore Genome</a>
+                        <a href="/gene-search/" class="btn btn-outline-secondary ms-2">Back to Gene Search</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="dashboard-section shadow-sm p-4 mb-4">
+                <h5 class="fw-semibold mb-3">Genome Location</h5>
+                {% if location %}
+                <ul class="list-group list-group-flush mb-3">
+                    <li class="list-group-item"><strong>Contig:</strong> {{ location.seqid }}</li>
+                    <li class="list-group-item"><strong>Feature:</strong> {{ location.feature_type }}</li>
+                    <li class="list-group-item"><strong>Coordinates:</strong> {{ location.start }} - {{ location.end }} ({{ location.strand }})</li>
+                    <li class="list-group-item"><strong>Source file:</strong> {{ location.file }}</li>
+                </ul>
+                <div class="locus-bar">
+                    {% if location.contig_length %}
+                        <span class="locus-highlight" style="left: {{ location.relative_start }}%; width: {{ location.relative_width }}%;"></span>
+                    {% else %}
+                        <span class="locus-highlight" style="left:0%; width:100%; opacity:0.2;"></span>
+                    {% endif %}
+                </div>
+                <p class="text-muted small mt-2">The bar shows the gene locus on the contig. It is an approximate visualization based on available GFF data.</p>
+                {% else %}
+                <div class="alert alert-warning mb-0">No genome location was found for this gene. Ensure the species genome GFF/FASTA files are available in static/data/{{ species_dir }}/genome.</div>
+                {% endif %}
+            </div>
+
+            <div class="dashboard-section shadow-sm p-4 mb-4" id="geneFamilySection">
+                <h5 class="fw-semibold mb-3">Gene Family Membership</h5>
+                <div id="geneFamilyLoading" class="text-muted">Loading gene family membership...</div>
+                <div id="geneFamilyContent" class="d-none">
+                    <div class="mb-3" id="geneFamilyBadges"></div>
+                    <div class="accordion" id="geneFamilyAccordion"></div>
+                </div>
+                <div id="geneFamilyEmpty" class="alert alert-secondary mb-0 d-none">This gene is not currently associated with any tracked gene families.</div>
+            </div>
+
+            <div class="dashboard-section shadow-sm p-4">
+                <h5 class="fw-semibold mb-3">Sequences</h5>
+
+                {% if sequence_entries %}
+                {% for entry in sequence_entries %}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <h6 class="mb-0">{{ entry.label }} Sequence</h6>
+                            <small class="text-muted">{{ entry.file_name }}{% if entry.format %} ({{ entry.format }}){% endif %}</small>
+                        </div>
+                        <button type="button" class="btn btn-link btn-sm p-0 sequence-toggle" data-target="sequence-{{ entry.type }}">Show sequence</button>
+                    </div>
+                    <div id="sequence-{{ entry.type }}" class="sequence-box d-none">{{ entry.raw_sequence }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    No sequence was found for this gene in the selected files.
+                    {% if not protein_sequence_files and not cds_sequence_files %}
+                    Make sure the CDS and protein FASTA files exist under <code>static/data/{{ species_dir }}/genome</code>.
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="dashboard-section shadow-sm p-4 h-100" id="annotationSection">
+                <h5 class="fw-semibold mb-3">Functional Annotation</h5>
+                <div id="annotationLoading" class="text-muted">Loading annotation...</div>
+                <div id="annotationContent" class="d-none">
+                    <table class="table table-borderless annotation-table mb-0" id="annotationFieldsTable">
+                        <tbody></tbody>
+                    </table>
+                    <div id="annotationEmpty" class="alert alert-secondary mb-0 d-none">No additional annotation fields are available for this gene.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm p-4">
+                <h5 class="fw-semibold mb-3">InterProScan Annotation</h5>
+                <div id="interproLoading" class="text-muted">Loading InterProScan annotation...</div>
+                <div id="interproContent" class="d-none">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped table-bordered text-center align-middle mb-0" id="interproTable" style="font-size: 0.85rem; white-space: nowrap;">
+                            <thead class="table-dark position-sticky top-0"><tr id="interproHeaderRow"></tr></thead>
+                            <tbody id="interproBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="interproEmpty" class="alert alert-secondary mb-0 d-none">No InterProScan annotation rows were found for this gene.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm p-4">
+                <h5 class="fw-semibold mb-3">Genome Browser</h5>
+                <div class="jbrowse-frame">
+                    {% with config_url='/jbrowse-config/?data='|add:jbrowse_data_path %}
+                        <div id="jbrowse-placeholder" class="alert alert-light border rounded p-4 text-center">
+                            <button id="jbrowse-load-button" class="btn btn-primary" type="button" aria-expanded="false">
+                                <span id="jbrowse-button-text">Show Genome Browser</span>
+                                <span id="jbrowse-button-spinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                        <div id="jbrowse-iframe-wrapper" style="display:none; min-height:300px; border:none;">
+                            <!-- iframe will be injected when the user clicks the button -->
+                        </div>
+                        <div id="jbrowse-data"
+                             data-config-url="{{ config_url|escape }}"
+                             data-loc="{{ jbrowse_loc|default:''|escape }}"
+                             data-tracks="{{ jbrowse_track_ids|default:'annotationTrack'|escape }}"></div>
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function toggleCollapsibleList(elementId, button) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.warn('Collapsible element not found:', elementId);
+            return;
+        }
+        const container = element.closest('.annotation-collapsible');
+        const summary = container ? container.querySelector('.annotation-summary') : null;
+        const isHidden = element.classList.contains('d-none');
+        if (isHidden) {
+            element.classList.remove('d-none');
+            if (summary) {
+                summary.classList.add('d-none');
+            }
+            button.textContent = 'Show less';
+        } else {
+            element.classList.add('d-none');
+            if (summary) {
+                summary.classList.remove('d-none');
+            }
+            button.textContent = 'Show all';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const loadButton = document.getElementById('jbrowse-load-button');
+        const iframeWrapper = document.getElementById('jbrowse-iframe-wrapper');
+        const jbrowseData = document.getElementById('jbrowse-data');
+        if (!loadButton || !iframeWrapper || !jbrowseData) {
+            return;
+        }
+
+        const buttonText = document.getElementById('jbrowse-button-text');
+        const buttonSpinner = document.getElementById('jbrowse-button-spinner');
+
+        const showSpinner = (show) => {
+            if (buttonSpinner) {
+                buttonSpinner.classList.toggle('d-none', !show);
+            }
+        };
+
+        const updateButtonLabel = (label, expanded) => {
+            if (buttonText) {
+                buttonText.textContent = label;
+            }
+            loadButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        };
+
+        const loadBrowser = function() {
+            loadButton.disabled = true;
+            showSpinner(true);
+            updateButtonLabel('Loading genome browser...', false);
+
+            const configUrl = jbrowseData.dataset.configUrl;
+            const loc = jbrowseData.dataset.loc;
+            const tracks = jbrowseData.dataset.tracks;
+            let iframeSrc = '/static/jbrowse/index.html?cachebust=1&config=' + encodeURIComponent(configUrl) + '&assembly=assembly1';
+            if (tracks) {
+                iframeSrc += '&tracks=' + encodeURIComponent(tracks);
+            }
+            if (loc) {
+                iframeSrc += '&loc=' + encodeURIComponent(loc);
+            }
+
+            const iframe = document.createElement('iframe');
+            iframe.src = iframeSrc;
+            iframe.frameBorder = '0';
+            iframe.width = '100%';
+            iframe.height = '500';
+            iframe.style.minHeight = '500px';
+            iframe.style.border = 'none';
+            iframe.loading = 'lazy';
+
+            iframe.addEventListener('load', function() {
+                loadButton.disabled = false;
+                showSpinner(false);
+                updateButtonLabel('Hide Genome Browser', true);
+            });
+            iframe.addEventListener('error', function() {
+                loadButton.disabled = false;
+                showSpinner(false);
+                updateButtonLabel('Show Genome Browser', false);
+                alert('Failed to load the genome browser. Please try again.');
+            });
+
+            iframeWrapper.appendChild(iframe);
+            iframeWrapper.style.display = 'block';
+            loadButton.classList.remove('btn-primary');
+            loadButton.classList.add('btn-outline-secondary');
+
+            loadButton.removeEventListener('click', loadBrowser);
+            loadButton.addEventListener('click', function() {
+                if (iframeWrapper.style.display === 'none') {
+                    iframeWrapper.style.display = 'block';
+                    updateButtonLabel('Hide Genome Browser', true);
+                } else {
+                    iframeWrapper.style.display = 'none';
+                    updateButtonLabel('Show Genome Browser', false);
+                }
+            });
+        };
+
+        loadButton.addEventListener('click', loadBrowser);
+
+        const sequenceToggles = document.querySelectorAll('.sequence-toggle');
+        sequenceToggles.forEach((toggle) => {
+            toggle.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const targetElement = document.getElementById(targetId);
+                if (!targetElement) {
+                    return;
+                }
+                const isHidden = targetElement.classList.contains('d-none');
+                targetElement.classList.toggle('d-none');
+                this.textContent = isHidden ? 'Hide sequence' : 'Show sequence';
+            });
+        });
+
+        const detailParams = document.getElementById('geneDetailExtrasParams');
+        if (detailParams) {
+            const extrasUrl = detailParams.dataset.url;
+            const geneId = detailParams.dataset.geneId;
+            const taxonomyId = detailParams.dataset.taxonomyId;
+            const species = detailParams.dataset.species;
+            loadGeneDetailExtras(extrasUrl, geneId, taxonomyId, species);
+        }
+
+        function createElement(tag, attrs = {}, text = '') {
+            const el = document.createElement(tag);
+            Object.keys(attrs).forEach((key) => el.setAttribute(key, attrs[key]));
+            if (text) {
+                el.textContent = text;
+            }
+            return el;
+        }
+
+        function renderAnnotationFields(fields) {
+            const annotationLoading = document.getElementById('annotationLoading');
+            const annotationContent = document.getElementById('annotationContent');
+            const annotationEmpty = document.getElementById('annotationEmpty');
+            const tableBody = document.querySelector('#annotationFieldsTable tbody');
+            if (!annotationLoading || !annotationContent || !annotationEmpty || !tableBody) {
+                return;
+            }
+            tableBody.innerHTML = '';
+            if (fields && fields.length) {
+                fields.forEach(([label, value]) => {
+                    const row = document.createElement('tr');
+                    const labelCell = createElement('th', { class: 'text-muted align-top' }, label);
+                    const valueCell = document.createElement('td');
+                    valueCell.className = 'text-break';
+                    valueCell.innerHTML = value || '';
+                    row.appendChild(labelCell);
+                    row.appendChild(valueCell);
+                    tableBody.appendChild(row);
+                });
+                annotationLoading.classList.add('d-none');
+                annotationContent.classList.remove('d-none');
+                annotationEmpty.classList.add('d-none');
+            } else {
+                annotationLoading.classList.add('d-none');
+                annotationContent.classList.add('d-none');
+                annotationEmpty.classList.remove('d-none');
+            }
+        }
+
+        function renderInterproScan(interpro) {
+            const interproLoading = document.getElementById('interproLoading');
+            const interproContent = document.getElementById('interproContent');
+            const interproEmpty = document.getElementById('interproEmpty');
+            const headerRow = document.getElementById('interproHeaderRow');
+            const body = document.getElementById('interproBody');
+            if (!interproLoading || !interproContent || !interproEmpty || !headerRow || !body) {
+                return;
+            }
+            headerRow.innerHTML = '';
+            body.innerHTML = '';
+            if (interpro && interpro.rows && interpro.rows.length) {
+                const headers = interpro.header || [];
+                headers.forEach((header) => {
+                    const th = createElement('th', { class: 'fw-bold px-3 py-3 border-0' }, header);
+                    headerRow.appendChild(th);
+                });
+                interpro.rows.forEach((row) => {
+                    const tr = document.createElement('tr');
+                    row.forEach((cell, index) => {
+                        const td = document.createElement('td');
+                        td.className = 'px-3 py-2';
+                        if (index === 0) {
+                            td.classList.add('text-start');
+                            td.innerHTML = `<strong>${cell || ''}</strong>`;
+                        } else {
+                            td.textContent = cell || '';
+                        }
+                        tr.appendChild(td);
+                    });
+                    body.appendChild(tr);
+                });
+                interproLoading.classList.add('d-none');
+                interproContent.classList.remove('d-none');
+                interproEmpty.classList.add('d-none');
+            } else {
+                interproLoading.classList.add('d-none');
+                interproContent.classList.add('d-none');
+                interproEmpty.classList.remove('d-none');
+            }
+        }
+
+        function renderGeneFamilyMemberships(memberships) {
+            const loading = document.getElementById('geneFamilyLoading');
+            const content = document.getElementById('geneFamilyContent');
+            const empty = document.getElementById('geneFamilyEmpty');
+            const badges = document.getElementById('geneFamilyBadges');
+            const accordion = document.getElementById('geneFamilyAccordion');
+            if (!loading || !content || !empty || !badges || !accordion) {
+                return;
+            }
+            const all = memberships.All || [];
+            const annevo = memberships.ANNEVO || [];
+            const evidence = memberships.Evidence_based || [];
+            badges.innerHTML = '';
+            accordion.innerHTML = '';
+            if (all.length || annevo.length || evidence.length) {
+                badges.innerHTML = `
+                    <span class="badge bg-primary me-1">All: ${all.length}</span>
+                    <span class="badge bg-info text-dark me-1">ANNEVO: ${annevo.length}</span>
+                    <span class="badge bg-success me-1">Evidence-based: ${evidence.length}</span>
+                `;
+
+                const sectionHtml = (title, key, items) => {
+                    const collapseId = `collapse${key}`;
+                    const headingId = `heading${key}`;
+                    const visibleClass = key === 'All' ? 'show' : '';
+                    const inner = items.map((family) => `
+                        <a href="/gene-family/${encodeURIComponent(family.family_id)}/?source=${encodeURIComponent(family.source)}" class="list-group-item list-group-item-action py-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <strong>${family.family_name}</strong>
+                                    <div class="small text-muted">Source: ${family.source} · ${family.presented_species}</div>
+                                </div>
+                                <span class="badge bg-secondary rounded-pill">${family.member_count} genes</span>
+                            </div>
+                        </a>
+                    `).join('');
+                    if (!items.length) {
+                        return `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="${headingId}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                                        ${title}
+                                    </button>
+                                </h2>
+                                <div id="${collapseId}" class="accordion-collapse collapse ${visibleClass}" aria-labelledby="${headingId}" data-bs-parent="#geneFamilyAccordion">
+                                    <div class="accordion-body p-3 text-muted">No ${title} memberships found.</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="${headingId}">
+                                <button class="accordion-button ${visibleClass ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${visibleClass ? 'true' : 'false'}" aria-controls="${collapseId}">
+                                    ${title}
+                                </button>
+                            </h2>
+                            <div id="${collapseId}" class="accordion-collapse collapse ${visibleClass}" aria-labelledby="${headingId}" data-bs-parent="#geneFamilyAccordion">
+                                <div class="accordion-body p-0">
+                                    <div class="list-group list-group-flush">
+                                        ${inner}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                };
+
+                accordion.innerHTML = sectionHtml('All Sources', 'All', all)
+                    + sectionHtml('ANNEVO', 'Annevo', annevo)
+                    + sectionHtml('Evidence-based', 'Evidence', evidence);
+                loading.classList.add('d-none');
+                content.classList.remove('d-none');
+                empty.classList.add('d-none');
+            } else {
+                loading.classList.add('d-none');
+                content.classList.add('d-none');
+                empty.classList.remove('d-none');
+            }
+        }
+
+        async function loadGeneDetailExtras(url, geneId, taxonomyId, species) {
+            if (!url || !geneId) {
+                return;
+            }
+            const params = new URLSearchParams({ gene_id: geneId });
+            if (taxonomyId) {
+                params.set('taxonomy_id', taxonomyId);
+            } else if (species) {
+                params.set('species', species);
+            }
+            try {
+                const response = await fetch(`${url}?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load details: ${response.statusText}`);
+                }
+                const data = await response.json();
+                if (data.error) {
+                    console.warn('gene_detail_extras error:', data.error);
+                    document.getElementById('geneDescription').textContent = 'Description not available.';
+                    renderAnnotationFields([]);
+                    renderInterproScan({ header: [], rows: [] });
+                    renderGeneFamilyMemberships({ All: [], ANNEVO: [], Evidence_based: [] });
+                    return;
+                }
+                if (data.annotation_description) {
+                    const desc = document.getElementById('geneDescription');
+                    if (desc) {
+                        desc.textContent = data.annotation_description;
+                    }
+                }
+                renderAnnotationFields(data.annotation_fields || []);
+                renderInterproScan(data.interpro || { header: [], rows: [] });
+                renderGeneFamilyMemberships(data.gene_family_memberships || { All: [], ANNEVO: [], Evidence_based: [] });
+            } catch (error) {
+                console.error(error);
+                document.getElementById('geneDescription').textContent = 'Description not available.';
+                renderAnnotationFields([]);
+                renderInterproScan({ header: [], rows: [] });
+                renderGeneFamilyMemberships({ All: [], ANNEVO: [], Evidence_based: [] });
+            }
+        }
+    });
+</script>
+{% endblock %}

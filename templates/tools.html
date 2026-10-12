@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Tools - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Tools</h2>
+        <p class="lead text-white-50">Access AnnelidaDB tools available here: BLAST and Gene Search.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="dashboard-section shadow-sm p-4">
+                <h4 class="fw-bold mb-4">Available Tools</h4>
+                <div class="alert alert-info mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>New:</strong> The Gene Family module has been added. Click the link below to view example gene family listings.
+                        </div>
+                        <a href="/gene-family/" class="btn btn-sm btn-info">Open Gene Family</a>
+                    </div>
+                </div>
+                <div class="list-group">
+                    <a href="/blast/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">BLAST</h5>
+                            <p class="mb-0 text-muted">Run sequence alignments against local databases with nucleotide and protein BLAST support.</p>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">Open</span>
+                    </a>
+                    <a href="/gene-family/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">Gene Family <span class="badge bg-info ms-2">New</span></h5>
+                            <p class="mb-0 text-muted">Browse gene families with representative genes, species membership, and functional description.</p>
+                        </div>
+                        <span class="badge bg-info rounded-pill">Open</span>
+                    </a>
+                    <a href="/gene-search/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">Gene Search</h5>
+                            <p class="mb-0 text-muted">Search gene information and browse matching results.</p>
+                        </div>
+                        <span class="badge bg-success rounded-pill">Open</span>
+                    </a>
+                    <a href="/synteny-upload/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">Synteny Upload</h5>
+                            <p class="mb-0 text-muted">Submit private species.pep and species.bed files for background synteny comparison.</p>
+                        </div>
+                        <span class="badge bg-warning rounded-pill">Upload</span>
+                    </a>
+                    <a href="/synteny/" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">Synteny Browse</h5>
+                            <p class="mb-0 text-muted">Browse existing Annelida Oxford plot synteny comparisons.</p>
+                        </div>
+                        <span class="badge bg-info rounded-pill">Browse</span>
+                    </a>
+                    <div class="list-group-item">
+                        <div class="d-flex flex-column gap-3">
+                            <div>
+                                <h5 class="mb-1 fw-bold">Genome Browser</h5>
+                                <p class="mb-0 text-muted">Open JBrowse for a selected species to inspect gene models and genomic context.</p>
+                            </div>
+                            {% if species_list %}
+                            <div class="row g-2 align-items-center">
+                                <div class="col-12 col-md-8">
+                                    <select id="jbrowse-species-select" class="form-select">
+                                        {% for species in species_list %}
+                                        <option value="{{ species.species_dir }}">{{ species.species }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-4 d-grid">
+                                    <button id="jbrowse-open-button" class="btn btn-outline-primary">Open JBrowse</button>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-secondary mb-0">No genome-enabled species are available to open in JBrowse.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if species_list %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const button = document.getElementById('jbrowse-open-button');
+        const select = document.getElementById('jbrowse-species-select');
+        if (!button || !select) {
+            return;
+        }
+        button.addEventListener('click', function() {
+            const speciesDir = select.value;
+            if (!speciesDir) {
+                return;
+            }
+            const url = '/jbrowse/?data=/static/data/' + encodeURIComponent(speciesDir) + '/genome';
+            window.location.href = url;
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title }} - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<style>
+    .species-italic {
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Synteny Oxford Plot</h2>
+        <p class="lead text-white-75">Browse available Oxford plot synteny comparisons between species pairs and inspect matching taxonomy metadata.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    {% if synteny_summary %}
+    <div class="dashboard-section p-4 mb-4">
+        <div class="row g-4 page-summary-row">
+            {% for card in synteny_summary %}
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="p-4 rounded-4 border border-2 h-100 page-summary-card {{ card.border_class }}">
+                    <h6 class="text-uppercase text-muted mb-2">{{ card.title }}</h6>
+                    <p class="display-6 fw-bold mb-1">{{ card.value }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    <div class="row gy-4">
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3"><i class="fas fa-search text-secondary me-2"></i>Synteny Browse</h5>
+                    <p class="text-secondary">Browse existing Annelida Oxford plot synteny comparisons. If you want to upload your own `species.pep` and `species.bed` data, click the button below.</p>
+                    <a href="/synteny-upload/" class="btn btn-warning">Go to Synteny Upload</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="dashboard-section selector-card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-4"><i class="fas fa-random text-secondary me-2"></i>Select species pair</h5>
+                    {% if species1_options %}
+                    <form id="syntenyForm" method="get" action="/synteny/">
+                        <div class="row g-4">
+                            <div class="col-12 col-md-6">
+                                <label for="species1" class="form-label">Species 1</label>
+                                <select id="species1" name="species1" class="form-select species-italic" required>
+                                    {% for species in species1_options %}
+                                    <option value="{{ species }}" {% if species == selected_species1 %}selected{% endif %}><i>{{ species }}</i></option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="species2" class="form-label">Species 2</label>
+                                <select id="species2" name="species2" class="form-select species-italic" required>
+                                    {% for species in species2_options %}
+                                    <option value="{{ species }}" {% if species == selected_species2 %}selected{% endif %}><i>{{ species }}</i></option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-play me-2"></i>View matching file</button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        No Oxford plot files were detected under /static/plots/Synteny/.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if selected_species1 or selected_species2 %}
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm border-0">
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded-4 p-4 h-100 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h6 class="mb-1 fw-semibold">species 1</h6>
+                                        {% if selected_species1_tax %}
+                                        <a href="{% url 'species_detail' selected_species1_tax.ncbi_taxonomy_id|default:selected_species1_tax.species %}" class="h5 fw-bold text-dark species-italic text-decoration-none">{{ selected_species1_tax.species }}</a>
+                                        {% else %}
+                                        <span class="h5 fw-bold text-dark species-italic"><i>{{ selected_species1|default:'-' }}</i></span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <ul class="list-unstyled mb-4 text-secondary">
+                                    <li><strong>Class:</strong> {{ selected_species1_tax.class_name|default:'-' }}</li>
+                                    <li><strong>Order:</strong> {{ selected_species1_tax.order|default:'-' }}</li>
+                                    <li><strong>Family:</strong> {{ selected_species1_tax.family|default:'-' }}</li>
+                                </ul>
+                                {% if oxford_url1 %}
+                                <div class="mt-auto">
+                                    <h6 class="fw-bold mb-3">Oxford Plot</h6>
+                                    <div class="bg-light rounded-4 p-3 text-center" style="min-height: 600px;">
+                                        <img src="{{ oxford_url1 }}" alt="Oxford Plot 1" width="100%" height="100%" style="min-height: 600px; object-fit: contain; display: block;" />
+                                        <div class="mt-2 text-end">
+                                            <a href="{{ oxford_url1 }}" target="_blank" class="btn btn-sm btn-primary">Download Oxford Plot</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded-4 p-4 h-100 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h6 class="mb-1 fw-semibold">species 2</h6>
+                                        {% if selected_species2_tax %}
+                                        <a href="{% url 'species_detail' selected_species2_tax.ncbi_taxonomy_id|default:selected_species2_tax.species %}" class="h5 fw-bold text-dark species-italic text-decoration-none">{{ selected_species2_tax.species }}</a>
+                                        {% else %}
+                                        <span class="h5 fw-bold text-dark species-italic"><i>{{ selected_species2|default:'-' }}</i></span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <ul class="list-unstyled mb-4 text-secondary">
+                                    <li><strong>Class:</strong> {{ selected_species2_tax.class_name|default:'-' }}</li>
+                                    <li><strong>Order:</strong> {{ selected_species2_tax.order|default:'-' }}</li>
+                                    <li><strong>Family:</strong> {{ selected_species2_tax.family|default:'-' }}</li>
+                                </ul>
+                                {% if oxford_url2 %}
+                                <div class="mt-auto">
+                                    <h6 class="fw-bold mb-3">Oxford Plot</h6>
+                                    <div class="bg-light rounded-4 p-3 text-center" style="min-height: 600px;">
+                                        <img src="{{ oxford_url2 }}" alt="Oxford Plot 2" width="100%" height="100%" style="min-height: 600px; object-fit: contain; display: block;" />
+                                        <div class="mt-2 text-end">
+                                            <a href="{{ oxford_url2 }}" target="_blank" class="btn btn-sm btn-primary">Download Oxford Plot</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h5 class="card-title mb-1">Oxford Plot Preview</h5>
+                        </div>
+                        {% if active_filename %}
+                        <span class="badge bg-success">{{ active_filename }}</span>
+                        {% endif %}
+                    </div>
+                    {% if plot_url %}
+                    <div class="border rounded overflow-hidden plot-frame" style="min-height: 760px; height: 76vh;">
+                        <img src="{{ plot_url }}" alt="Synteny Plot" width="100%" height="100%" style="max-height: 100%; object-fit: contain; display: block;" />
+                    </div>
+                    {% elif species1_options %}
+                    <div class="alert alert-secondary text-center py-5">
+                        <i class="fas fa-file-excel fa-2x mb-3 text-muted"></i>
+                        <div class="mt-2 text-muted">Please select another available pair from the left.</div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning text-center py-5">
+                        <i class="fas fa-folder-open fa-2x mb-3"></i>
+                        <div>No synteny Oxford plot files were found.</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    const speciesPairs = {{ species_pairs_json|safe }};
+    const species1Select = document.getElementById('species1');
+    const species2Select = document.getElementById('species2');
+    const syntenyForm = document.getElementById('syntenyForm');
+    function updateSpecies2Options() {
+        const species1 = species1Select.value;
+        const options = speciesPairs[species1] || [];
+        species2Select.innerHTML = '';
+        options.forEach(species2 => {
+            const option = document.createElement('option');
+            option.value = species2;
+            option.textContent = species2;
+            species2Select.appendChild(option);
+        });
+    }
+    if (species1Select && species2Select && syntenyForm) {
+        species1Select.addEventListener('change', () => {
+            updateSpecies2Options();
+            species2Select.selectedIndex = 0;
+            syntenyForm.submit();
+        });
+        species2Select.addEventListener('change', () => {
+            syntenyForm.submit();
+        });
+    }
+
+    const autoRefreshEnabled = {% if upload_info and upload_info.status == 'running' %}true{% else %}false{% endif %};
+    const refreshButton = document.getElementById('refresh-status-button');
+    const refreshMessage = document.getElementById('refresh-message');
+    const refreshIntervalMs = 30000;
+    let refreshCountdown = refreshIntervalMs / 1000;
+    let refreshTimer = null;
+
+    function updateRefreshMessage() {
+        if (refreshMessage) {
+            refreshMessage.textContent = `Auto-refresh in ${refreshCountdown}s`; 
+        }
+    }
+
+    function startAutoRefresh() {
+        if (!autoRefreshEnabled || !refreshMessage) {
+            return;
+        }
+        updateRefreshMessage();
+        refreshTimer = setInterval(() => {
+            refreshCountdown -= 1;
+            if (refreshCountdown <= 0) {
+                window.location.reload();
+            } else {
+                updateRefreshMessage();
+            }
+        }, 1000);
+    }
+
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => {
+            window.location.reload();
+        });
+    }
+
+    if (autoRefreshEnabled) {
+        startAutoRefresh();
+    }
+</script>
+{% endblock %}

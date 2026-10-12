@@ -1,0 +1,576 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title|default:"Genome Detail" }} - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="container mb-5">
+    <div class="row mb-4 gx-4">
+        <div class="col-lg-3">
+            <div class="dashboard-section p-4 mb-4">
+                <div class="mb-4">
+                    <h1 class="h4 fw-bold mb-2"><i>{{ tax.species }}</i></h1>
+                    <p class="text-secondary mb-0">NCBI Taxonomy ID: <strong>{{ tax.ncbi_taxonomy_id }}</strong></p>
+                </div>
+                <h2 class="h6 fw-bold mb-3">Taxonomy</h2>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Phylum</span><span>{{ tax.phylum|default:'Unassigned' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Class</span><span>{{ tax.class_name|default:'Unassigned' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Order</span><span>{{ tax.order|default:'Unassigned' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Family</span><span>{{ tax.family|default:'Unassigned' }}</span></li>
+                </ul>
+            </div>
+            <div class="dashboard-section p-4 mb-4">
+                <div class="d-grid gap-2">
+                    <a href="/genome/" class="btn btn-outline-info btn-sm w-100"><i class="fas fa-arrow-left me-2"></i>Back to Genomes</a>
+                    <a href="/jbrowse/?data=/static/data/{{ species_dir }}/genome" class="btn btn-outline-success btn-sm w-100">Open in JBrowse</a>
+                    <a href="{% url 'species_detail' tax.ncbi_taxonomy_id|default:tax.species %}" class="btn btn-outline-secondary btn-sm w-100">Explore the species</a>
+                </div>
+            </div>
+            <div class="dashboard-section p-4">
+                <h2 class="h6 fw-bold mb-3">Assembly Statistics</h2>
+                {% if genome %}
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Size</span><span>{{ genome.size_mb|default:'-' }} Mb</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Repeat</span><span>{{ repeat_percentage|default:'-' }} %</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Assembly Level</span><span>{{ genome.assembly_level|default:'-' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">GC Content</span><span>{{ genome.gc_content|default:'-' }} %</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Scaffold N50</span><span>{{ genome.scaffold_n50|default:'-' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Gene Count</span><span>{{ genome.gene_number|default:'-' }}</span></li>
+                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center"><span class="text-secondary">Gene Count (ANNEVO)</span><span>{{ genome.gene_number_annevo|default:'-' }}</span></li>
+                </ul>
+                <div class="mt-3 pt-3 border-top">
+                    <h3 class="h6 fw-bold text-uppercase text-muted mb-2">BUSCO Completeness</h3>
+                    <div class="p-2 mb-2 rounded bg-light border">
+                        <div class="small fw-semibold text-primary mb-1">metazoa_odb12 (n=672)</div>
+                        <div class="d-flex justify-content-between align-items-center mb-1"><span class="small text-secondary">Genome</span><span class="small fw-bold text-success" title="{{ genome.completeness_genome_raw|default:'' }}">{{ genome.completeness_genome_sd|default:'-' }}</span></div>
+                        <div class="d-flex justify-content-between align-items-center mb-1"><span class="small text-secondary">Gene</span><span class="small fw-bold text-info" title="{{ genome.completeness_gene|default:'' }}">{{ genome.completeness_gene_sd|default:'-' }}</span></div>
+                        <div class="d-flex justify-content-between align-items-center"><span class="small text-secondary">Gene (ANNEVO)</span><span class="small fw-bold text-info" title="{{ genome.completeness_gene_annevo|default:'' }}">{{ genome.completeness_gene_annevo_sd|default:'-' }}</span></div>
+                    </div>
+                    <div class="p-2 rounded bg-light border">
+                        <div class="small fw-semibold text-info mb-1">lophotrochozoa_odb12.2 (n=1329)</div>
+                        <div class="d-flex justify-content-between align-items-center mb-1"><span class="small text-secondary">Genome</span><span class="small fw-bold text-success" title="{{ genome.completeness_genome_lopho_raw|default:'' }}">{{ genome.completeness_genome_lopho_sd|default:'-' }}</span></div>
+                        <div class="d-flex justify-content-between align-items-center mb-1"><span class="small text-secondary">Gene</span><span class="small fw-bold text-info" title="{{ genome.completeness_gene_lopho|default:'' }}">{{ genome.completeness_gene_lopho_sd|default:'-' }}</span></div>
+                        <div class="d-flex justify-content-between align-items-center"><span class="small text-secondary">Gene (ANNEVO)</span><span class="small fw-bold text-info" title="{{ genome.completeness_gene_annevo_lopho|default:'' }}">{{ genome.completeness_gene_annevo_lopho_sd|default:'-' }}</span></div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">No genome data available.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-9">
+            <div class="dashboard-section p-4">
+                <h2 class="h5 fw-bold mb-3">BUSCO Completeness</h2>
+                <div class="bg-light rounded-4 p-4 text-center" style="min-height: 560px;">
+                    {% if busco_url %}
+                    <img src="{{ busco_url }}" alt="BUSCO plot" class="img-fluid rounded shadow-sm" style="max-height:100%; width:auto; object-fit:contain;" onerror="this.onerror=null;this.style.display='none';">
+                    {% else %}
+                    <div class="py-5 text-muted fst-italic">BUSCO plot not available.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="dashboard-section p-4">
+                <h2 class="h5 fw-bold mb-3">Publication References</h2>
+                {% if publications %}
+                <ul class="list-group list-group-flush">
+                    {% for pub in publications %}
+                    <li class="list-group-item px-0 py-3">
+                        <div class="fw-semibold">{{ pub.title|default:'Untitled publication'|safe }}</div>
+                        <div class="small text-secondary">
+                            <i>{{ pub.journal|default:'Unknown journal' }}</i>{% if pub.publication_date %} · {{ pub.publication_date }}{% endif %}
+                        </div>
+                        {% if pub.doi %}
+                        <div class="small mt-1"><a href="https://doi.org/{{ pub.doi }}" target="_blank">{{ pub.doi }}</a></div>
+                        {% endif %}
+                        {% if pub.authors %}
+                        <div class="small text-muted mt-1">Authors: {{ pub.authors }}</div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-muted">No publication data found for this species.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        {% if alg_url %}
+        <div class="col-lg-6">
+            <div class="dashboard-section p-4 border-start border-danger border-4">
+                <h2 class="h6 fw-bold mb-3">Ancestral Linkage Groups</h2>
+                <div class="bg-light rounded-4 p-3 text-center" style="min-height: 600px;">
+                    <img src="{{ alg_url }}" alt="ALG Plot" width="100%" height="100%" style="min-height: 600px; object-fit: contain; display: block;" />
+                </div>
+                <div class="mt-2 text-end">
+                    <a href="{{ alg_url }}" target="_blank" class="btn btn-sm btn-primary">Download ALG Plot</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if oxford_url %}
+        <div class="col-lg-6">
+            <div class="dashboard-section p-4 border-start border-secondary border-4">
+                <h2 class="h6 fw-bold mb-3">Oxford Plot Synteny</h2>
+                <div class="bg-light rounded-4 p-3 text-center" style="min-height: 600px;">
+                    <img src="{{ oxford_url }}" alt="Oxford Plot" width="100%" height="100%" style="min-height: 600px; object-fit: contain; display: block;" />
+                </div>
+                <div class="mt-2 text-end">
+                    <a href="{{ oxford_url }}" target="_blank" class="btn btn-sm btn-primary">Download Oxford Plot</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="dashboard-section p-4 border-start border-warning border-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+            <div>
+                <h2 class="h5 fw-bold mb-3">Download Files</h2>
+                <p class="text-muted mb-0">Select one or more files and add them to the Download Bar for a combined ZIP package.</p>
+            </div>
+            <div class="form-check form-switch mt-2 mt-md-0">
+                <input class="form-check-input" type="checkbox" id="downloadFilesSelectAll">
+                <label class="form-check-label" for="downloadFilesSelectAll">Select all</label>
+            </div>
+            <button type="button" id="downloadFilesBtn" class="btn btn-primary">Add Selected Files to Download Bar</button>
+        </div>
+        <div class="row g-3">
+            {% for item in file_downloads %}
+                {% if item.available %}
+                <div class="col-12 col-sm-6 col-xl-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="form-check">
+                                <input class="form-check-input download-file-checkbox" type="checkbox" id="downloadFileCheckbox{{ forloop.counter }}" data-file-path="{{ item.path }}" data-file-label="{{ item.label }}" style="width:1.25em; height:1.25em;">
+                                <label class="form-check-label fw-semibold ms-2" for="downloadFileCheckbox{{ forloop.counter }}">{{ item.label }}</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-secondary mb-0">No downloadable genome files were found.</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dashboard-section p-4 border-start border-info border-4">
+        <h2 class="h5 fw-bold mb-3">Annotation</h2>
+        {% if available_annotation_types %}
+        <form method="get" class="row row-cols-1 row-cols-md-4 g-3 mb-4">
+            {% if request.GET.query %}
+            <input type="hidden" name="query" value="{{ request.GET.query }}" />
+            {% endif %}
+            <div class="col">
+                <label class="form-label fw-semibold">Choose annotation file</label>
+                <select id="annotation-file-select" name="annotation_file" class="form-select" onchange="this.form.submit()">
+                    {% for option in annotation_file_options %}
+                    <option value="{{ option.label }}" {% if selected_annotation_file == option.label %}selected{% endif %}>
+                        {{ option.display_label }} - {{ option.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col">
+                <label class="form-label fw-semibold">Annotation search</label>
+                <div class="input-group">
+                    <input id="annotation-search-input" type="text" class="form-control" placeholder="Search annotation text" value="{{ request.GET.search|default:'' }}">
+                    <button type="button" class="btn btn-outline-secondary" id="annotation-search-button">Search</button>
+                    <button type="button" class="btn btn-outline-secondary" id="annotation-clear-button">Clear</button>
+                </div>
+            </div>
+            <div class="col" id="member-db-filter-wrapper" style="display: {% if selected_annotation_type == 'interproscan' %}block{% else %}none{% endif %};">
+                <label class="form-label fw-semibold">Member database</label>
+                <select id="member-db-filter" class="form-select">
+                    <option value="">All</option>
+                    {% for db in annotation_interpro_member_databases %}<option value="{{ db }}">{{ db }}</option>{% endfor %}
+                </select>
+            </div>
+        </form>
+        {% if selected_annotation_type == 'eggnog' %}
+        <div class="table-responsive mb-4">
+            <div class="alert alert-info small mb-3">
+                Gene IDs in the first column link directly to the gene detail page.
+            </div>
+            {% if annotation_eggnog_truncated %}
+            <div class="alert alert-warning small mb-3">
+                Previewing the first 100 rows of this annotation file. Click the button above to load the full file.
+            </div>
+            {% endif %}
+            <table id="eggnogAnnotationTable" class="table table-hover table-striped table-bordered text-center align-middle mb-0" style="font-size: 0.85rem; white-space: nowrap;">
+                <thead class="table-dark position-sticky top-0">
+                    <tr>
+                        {% for header in annotation_eggnog_header_cells %}
+                        <th class="fw-bold px-3 py-3 border-0">{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in annotation_eggnog_rows %}
+                    <tr>
+                        {% for cell in row %}
+                        {% if forloop.first %}
+                        <td class="px-3 py-2 text-start">
+                            <a href="{% url 'species_gene_detail' tax.ncbi_taxonomy_id cell %}" class="text-decoration-none">{{ cell }}</a>
+                        </td>
+                        {% else %}
+                        <td class="px-3 py-2">{{ cell }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif selected_annotation_type == 'interproscan' %}
+        <div class="table-responsive mb-4">
+            <div class="alert alert-info small mb-3">
+                Protein / gene IDs in the first column link directly to the gene detail page.
+            </div>
+            {% if annotation_interpro_truncated %}
+            <div class="alert alert-warning small mb-3">
+                Previewing the first 100 rows of this annotation file. Click the button above to load the full file.
+            </div>
+            {% endif %}
+            <table id="interproAnnotationTable" class="table table-hover table-striped table-bordered text-center align-middle mb-0" style="font-size: 0.85rem; white-space: nowrap;">
+                <thead class="table-dark position-sticky top-0">
+                    <tr>
+                        {% for header in annotation_interpro_headers %}
+                        <th class="fw-bold px-3 py-3 border-0">{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in annotation_interpro_rows %}
+                    <tr>
+                        {% for cell in row %}
+                        {% if forloop.first %}
+                        <td class="px-3 py-2 text-start">
+                            <a href="{% url 'species_gene_detail' tax.ncbi_taxonomy_id cell %}" class="text-decoration-none">{{ cell }}</a>
+                        </td>
+                        {% else %}
+                        <td class="px-3 py-2">{{ cell }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="alert alert-secondary">No annotation files were located.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="annotationModal" tabindex="-1" aria-labelledby="annotationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="annotationModalLabel">Gene Annotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="annotationModalBody">
+                <div class="text-center text-muted">Select a gene to load annotation.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+<script>
+    function showAnnotationError(selector, message) {
+        const $container = $(selector).closest('.table-responsive');
+        let $alert = $container.find('.annotation-error-message');
+        if (!$alert.length) {
+            $alert = $('<div class="alert alert-danger small annotation-error-message"></div>');
+            $container.prepend($alert);
+        }
+        $alert.text(message);
+    }
+
+    function clearAnnotationError(selector) {
+        const $container = $(selector).closest('.table-responsive');
+        $container.find('.annotation-error-message').remove();
+    }
+
+    function initializeDataTable(selector, annotationType) {
+        if (!$(selector).length) return null;
+        return $(selector).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: annotationDataUrl,
+                type: 'POST',
+                dataType: 'json',
+                data: function(d) {
+                    const queryValue = $('#annotation-search-input').val().trim();
+                    const memberDbValue = annotationType === 'interproscan' ? ($('#member-db-filter').val() || '') : '';
+                    const postData = $.extend({}, d, {
+                        annotation: annotationType,
+                        annotation_file: $('#annotation-file-select').val() || selectedAnnotationFile,
+                        search: queryValue,
+                        member_db: memberDbValue,
+                    });
+                    postData['search[value]'] = queryValue;
+                    return postData;
+                },
+                dataSrc: function(json) {
+                    clearAnnotationError(selector);
+                    if (!json) {
+                        showAnnotationError(selector, 'Annotation API returned no data.');
+                        return [];
+                    }
+                    if (json.error) {
+                        showAnnotationError(selector, json.error);
+                        console.warn('Annotation API response error:', json.error);
+                        return [];
+                    }
+                    if (annotationType === 'interproscan' && Array.isArray(json.member_dbs)) {
+                        const memberFilter = $('#member-db-filter');
+                        if (memberFilter.length) {
+                            const currentValue = memberFilter.val() || '';
+                            memberFilter.empty();
+                            memberFilter.append('<option value="">All</option>');
+                            json.member_dbs.forEach(function(db) {
+                                memberFilter.append('<option value="' + db + '">' + db + '</option>');
+                            });
+                            memberFilter.val(currentValue);
+                        }
+                    }
+                    return json.data || [];
+                },
+                error: function(xhr, status, error) {
+                    let responseMessage = 'Annotation AJAX request failed: ' + status + ' ' + error;
+                    if (xhr && xhr.responseText) {
+                        responseMessage += ' - ' + xhr.responseText;
+                    }
+                    showAnnotationError(selector, responseMessage);
+                    console.warn('Annotation AJAX request failed:', status, error, xhr && xhr.responseText);
+                },
+            },
+            pageLength: 25,
+            lengthMenu: [[25, 50, 100], [25, 50, 100]],
+            dom: 'Btip',
+            buttons: [
+                'copy',
+                'csv',
+                'excel',
+                'pdf',
+                'print'
+            ],
+            columnDefs: [
+                {
+                    targets: 0,
+                    render: function(data, type, row) {
+                        if (type === 'display' && data) {
+                            return '<a href="/species/{{ tax.ncbi_taxonomy_id }}/gene/' + encodeURIComponent(data) + '/" class="text-decoration-none">' + data + '</a>';
+                        }
+                        return data;
+                    }
+                }
+            ],
+            language: {
+                lengthMenu: 'Show _MENU_ entries',
+                info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+                paginate: {
+                    previous: 'Prev',
+                    next: 'Next'
+                }
+            }
+        });
+    }
+
+    const annotationDataUrl = "{% url 'genome_annotation_data' tax.ncbi_taxonomy_id|default:tax.species %}";
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+    $.ajaxSetup({
+        headers: { 'X-CSRFToken': csrftoken }
+    });
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightQuery = urlParams.get('query');
+    const selectedAnnotationFile = "{{ selected_annotation_file|default:''|escapejs }}";
+
+    function showGeneAnnotation(taxonomyId, geneId, species) {
+        if (!geneId) {
+            alert('Missing gene ID for annotation lookup.');
+            return;
+        }
+        const params = new URLSearchParams({ gene_id: geneId });
+        if (taxonomyId) {
+            params.set('taxonomy_id', taxonomyId);
+        } else if (species) {
+            params.set('species', species);
+        }
+
+        const body = document.getElementById('annotationModalBody');
+        document.getElementById('annotationModalLabel').innerText = `Annotation: ${geneId}`;
+        body.innerHTML = '<div class="text-center text-muted">Loading annotation...</div>';
+        const annotationModal = new bootstrap.Modal(document.getElementById('annotationModal'));
+        annotationModal.show();
+
+        fetch(`/api/gene_annotation/?${params.toString()}`)
+            .then(async response => {
+                if (!response.ok) {
+                    const error = await response.json().catch(() => null);
+                    body.innerHTML = `<div class="alert alert-danger">Unable to load annotation${error && error.error ? ': ' + error.error : '.'}</div>`;
+                    throw new Error('Annotation fetch failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                body.innerHTML = renderAnnotationHtml(data);
+            })
+            .catch(err => {
+                if (err.message !== 'Annotation fetch failed') {
+                    body.innerHTML = `<div class="alert alert-danger">Unable to load annotation: ${err.message}</div>`;
+                }
+            });
+    }
+
+    function renderAnnotationHtml(data) {
+        const sections = [];
+        const geneId = data.gene_id || 'Unknown';
+        const species = data.species || 'Unknown';
+        const taxonomyId = data.taxonomy_id || 'Unknown';
+
+        sections.push(`<p><strong>Gene:</strong> ${geneId}</p><p><strong>Species:</strong> ${species}</p><p><strong>Taxonomy ID:</strong> ${taxonomyId}</p>`);
+
+        if (data.eggnog && data.eggnog.rows && data.eggnog.rows.length) {
+            sections.push('<h5>EggNOG annotation</h5>');
+            const header = data.eggnog.header || [];
+            if (header.length) {
+                sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.eggnog.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            } else {
+                sections.push('<pre>' + data.eggnog.rows.map(row => row.join('\t')).join('\n') + '</pre>');
+            }
+            if (data.eggnog.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.eggnog.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No EggNOG annotation rows found.</div>');
+        }
+
+        if (data.interpro && data.interpro.rows && data.interpro.rows.length) {
+            sections.push('<h5>InterProScan annotation</h5>');
+            const header = data.interpro.header || [];
+            sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.interpro.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            if (data.interpro.member_dbs && data.interpro.member_dbs.length) {
+                sections.push(`<div class="text-muted small mb-3">Member DBs: ${data.interpro.member_dbs.join(', ')}</div>`);
+            }
+            if (data.interpro.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.interpro.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No InterProScan annotation rows found.</div>');
+        }
+
+        return sections.join('');
+    }
+
+    const eggnogTable = initializeDataTable('#eggnogAnnotationTable', 'eggnog');
+    const interproTable = initializeDataTable('#interproAnnotationTable', 'interproscan');
+
+    const annotationSearchInput = $('#annotation-search-input');
+    const annotationSearchButton = $('#annotation-search-button');
+    const annotationClearButton = $('#annotation-clear-button');
+
+    function getActiveAnnotationTable() {
+        return '{{ selected_annotation_type }}' === 'interproscan' ? interproTable : eggnogTable;
+    }
+
+    annotationSearchButton.on('click', function() {
+        const table = getActiveAnnotationTable();
+        if (table) {
+            table.search(annotationSearchInput.val().trim()).draw();
+        }
+    });
+
+    annotationClearButton.on('click', function() {
+        annotationSearchInput.val('');
+        const table = getActiveAnnotationTable();
+        if (table) {
+            table.search('').draw();
+        }
+    });
+
+    annotationSearchInput.on('keypress', function(event) {
+        if (event.which === 13) {
+            event.preventDefault();
+            annotationSearchButton.click();
+        }
+    });
+
+    const memberFilter = document.getElementById('member-db-filter');
+    if (memberFilter && interproTable) {
+        memberFilter.addEventListener('change', function() {
+            interproTable.draw();
+        });
+    }
+
+    function collectSelectedFiles() {
+        var selectedItems = [];
+        $('.download-file-checkbox:checked').each(function() {
+            var filePath = $(this).data('file-path');
+            var fileLabel = $(this).data('file-label');
+            if (filePath) {
+                selectedItems.push({ id: filePath, label: fileLabel || filePath });
+            }
+        });
+        return selectedItems;
+    }
+
+    $('#downloadFilesBtn').on('click', function() {
+        var selectedItems = collectSelectedFiles();
+        if (!selectedItems.length) {
+            alert('Please select at least one file to add to the download bar.');
+            return;
+        }
+        downloadCartAddSelectedFiles('selected_files_{{ tax.ncbi_taxonomy_id }}', '{{ tax.species }} Files', selectedItems);
+    });
+
+    var selectAllCheckbox = document.getElementById('downloadFilesSelectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            document.querySelectorAll('.download-file-checkbox').forEach(function(checkbox) {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+</script>
+{% endblock %}

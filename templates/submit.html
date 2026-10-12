@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Submit New Data - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Submit New Data</h2>
+        <p class="lead text-white-75">Send us a proposal for new dataset content. Submissions are reviewed manually and will not update the public database automatically.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4">
+        {% if success_message %}
+        <div class="alert alert-success">
+            <p>{{ success_message }}</p>
+            {% if success_link %}
+            <p>You can view your submission details at the following link: <a href="{{ success_link }}" target="_blank">{{ success_link }}</a></p>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if errors %}
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form id="dataSubmitForm" method="post" action="" class="row g-3" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="col-md-6">
+                <label for="data_type" class="form-label">Data Type</label>
+                <select id="data_type" name="data_type" class="form-select">
+                    <option value="taxonomy" {% if form_values.data_type == 'taxonomy' %}selected{% endif %}>Taxonomy</option>
+                    <option value="genome" {% if form_values.data_type == 'genome' %}selected{% endif %}>Genome</option>
+                    <option value="proteome" {% if form_values.data_type == 'proteome' %}selected{% endif %}>Proteome</option>
+                    <option value="epigenome" {% if form_values.data_type == 'epigenome' %}selected{% endif %}>Epigenome</option>
+                    <option value="mitogenome" {% if form_values.data_type == 'mitogenome' %}selected{% endif %}>Mitochondria</option>
+                    <option value="transcriptome" {% if form_values.data_type == 'transcriptome' %}selected{% endif %}>Transcriptome</option>
+                    <option value="singlecell" {% if form_values.data_type == 'singlecell' %}selected{% endif %}>Single-cell</option>
+                    <option value="symbiont" {% if form_values.data_type == 'symbiont' %}selected{% endif %}>Symbiont</option>
+                    <option value="synteny" {% if form_values.data_type == 'synteny' %}selected{% endif %}>Synteny</option>
+                    <option value="other" {% if form_values.data_type == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" id="title" name="title" class="form-control" value="{{ form_values.title }}" placeholder="Short title for the proposed data" required>
+            </div>
+            <div class="col-md-6">
+                <label for="submitter_name" class="form-label">Your Name</label>
+                <input type="text" id="submitter_name" name="submitter_name" class="form-control" value="{{ form_values.submitter_name }}" placeholder="Optional">
+            </div>
+            <div class="col-md-6">
+                <label for="submitter_email" class="form-label">Your Email</label>
+                <input type="email" id="submitter_email" name="submitter_email" class="form-control" value="{{ form_values.submitter_email }}" placeholder="Optional">
+            </div>
+            <div class="col-12">
+                <label for="source_url" class="form-label">Source URL</label>
+                <input type="url" id="source_url" name="source_url" class="form-control" value="{{ form_values.source_url }}" placeholder="Optional reference or dataset link">
+            </div>
+            <div class="col-12">
+                <label for="details" class="form-label">Details</label>
+                <textarea id="details" name="details" rows="8" class="form-control" placeholder="Describe the data you want to submit, including species, file types, source and scope." required>{{ form_values.details }}</textarea>
+            </div>
+            <div class="col-12">
+                <label for="data_files" class="form-label">Upload Data Files</label>
+                <input type="file" id="data_files" name="data_files" class="form-control" multiple>
+                <div class="form-text">Single file and total upload size must be less than 1.5 GB. You may optionally upload an original MD5 checksum file for later review.</div>
+            </div>
+            <div class="col-md-6">
+                <label for="md5_file" class="form-label">Original MD5 File</label>
+                <input type="file" id="md5_file" name="md5_file" class="form-control">
+                <div class="form-text">Optional. Administrators will verify MD5 checksums later.</div>
+            </div>
+            <div class="col-12">
+                <div id="uploadValidationMessage" class="text-danger small" style="display:none;"></div>
+            </div>
+            <div class="col-12 text-end">
+                <button type="submit" class="btn btn-primary">Submit for Review</button>
+            </div>
+            <script>
+                (function() {
+                    const form = document.getElementById('dataSubmitForm');
+                    const dataFilesInput = document.getElementById('data_files');
+                    const md5FileInput = document.getElementById('md5_file');
+                    const validationMessage = document.getElementById('uploadValidationMessage');
+                    const MAX_BYTES = 1.5 * 1024 * 1024 * 1024;
+
+                    function formatBytes(bytes) {
+                        if (bytes === 0) return '0 B';
+                        const units = ['B', 'KB', 'MB', 'GB'];
+                        const index = Math.floor(Math.log(bytes) / Math.log(1024));
+                        return (bytes / Math.pow(1024, index)).toFixed(2) + ' ' + units[index];
+                    }
+
+                    function validateUploads() {
+                        validationMessage.style.display = 'none';
+                        validationMessage.textContent = '';
+                        const files = Array.from(dataFilesInput.files || []);
+                        const md5File = md5FileInput.files && md5FileInput.files.length > 0;
+                        if (!files.length) {
+                            return true;
+                        }
+                        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+                        if (totalSize > MAX_BYTES) {
+                            validationMessage.textContent = `Total upload size ${formatBytes(totalSize)} exceeds the 1.5 GB limit.`;
+                            validationMessage.style.display = 'block';
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    form.addEventListener('submit', function(event) {
+                        if (!validateUploads()) {
+                            event.preventDefault();
+                        }
+                    });
+                })();
+            </script>
+        </form>
+    </div>
+</div>
+{% endblock %}

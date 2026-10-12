@@ -1,0 +1,400 @@
+{% extends 'base.html' %}
+{% block title %}JBrowse 2 Viewer - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<style>
+    .jbrowse-viewer {
+        width: 100%;
+        min-height: 900px;
+        border: 1px solid #d1d5db;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: #fff;
+    }
+    .jbrowse-status {
+        margin-bottom: 1rem;
+    }
+    .jbrowse-warning {
+        margin-bottom: 1rem;
+    }
+</style>
+{% if jbrowse_css_url %}
+<link rel="stylesheet" href="{{ jbrowse_css_url }}" />
+{% endif %}
+{% if not jbrowse_data %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">JBrowse 2 Viewer</h2>
+        <p class="lead text-white-50">Browse the selected genome assembly and tracks for the requested species.</p>
+    </div>
+</div>
+<div class="container my-5">
+    {% for warning in warnings %}
+    <div class="alert alert-warning jbrowse-warning">{{ warning }}</div>
+    {% endfor %}
+
+    {% if species_list and not jbrowse_data %}
+    <div class="card shadow-sm mb-4 jbrowse-status">
+        <div class="card-body">
+            <h5 class="fw-bold">Genome Browser Species Catalog</h5>
+            <p class="text-muted mb-3">Search and click a species name to open its JBrowse genome browser.</p>
+            <div class="table-responsive">
+                <table id="jbrowseGenomeTable" class="table table-striped table-hover align-middle w-100">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Class</th>
+                            <th>Order</th>
+                            <th>Family</th>
+                            <th>Species</th>
+                            <th>Assembly level</th>
+                            <th>Size (Mb)</th>
+                            <th>GC (%)</th>
+                            <th>Scaffold N50 (bp)</th>
+                            <th>Genome Completeness (%)</th>
+                            <th>Gene Number</th>
+                            <th>Gene Completeness (%)</th>
+                            <th>Gene number (ANNEVO)</th>
+                            <th>Gene Completeness (ANNEVO, %)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in genome_table_data %}
+                        <tr>
+                            <td>{{ row.taxonomy.class_name|default:'-' }}</td>
+                            <td>{{ row.taxonomy.order|default:'-' }}</td>
+                            <td>{{ row.taxonomy.family|default:'-' }}</td>
+                            <td>
+                                {% if row.has_jbrowse_data %}
+                                <a href="/jbrowse/?data=/static/data/{{ row.species_dir }}/genome" class="text-decoration-none fw-bold"><i>{{ row.taxonomy.species }}</i></a>
+                                {% else %}
+                                <span class="text-muted" title="JBrowse data not available"><i>{{ row.taxonomy.species }}</i></span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.assembly_level|default:'-' }}</td>
+                            <td><span class="badge bg-success">{{ row.size_mb|default:'-' }}</span></td>
+                            <td>{{ row.gc_content|default:'-' }}</td>
+                            <td>{{ row.scaffold_n50|default:'-' }}</td>
+                            <td>{{ row.completeness_genome_sd|default:'-' }}</td>
+                            <td>{{ row.gene_number|default:'-' }}</td>
+                            <td>{{ row.completeness_gene_sd|default:'-' }}</td>
+                            <td>{{ row.gene_number_annevo|default:'-' }}</td>
+                            <td>{{ row.completeness_gene_annevo_sd|default:'-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if jbrowse_data %}
+    {% if jbrowse_tax %}
+    <div class="card shadow-sm mb-4 jbrowse-status">
+        <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+            <div>
+                <h5 class="fw-bold mb-2"><a href="{% url 'species_detail' jbrowse_tax.ncbi_taxonomy_id|default:jbrowse_tax.species %}" class="text-decoration-none text-dark"><i>{{ jbrowse_tax.species }}</i></a></h5>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-info text-dark">Class: {{ jbrowse_tax.class_name|default:'Unknown' }}</span>
+                    <span class="badge bg-info text-dark">Order: {{ jbrowse_tax.order|default:'Unknown' }}</span>
+                    <span class="badge bg-info text-dark">Family: {{ jbrowse_tax.family|default:'Unknown' }}</span>
+                </div>
+            </div>
+            <div class="text-md-end">
+                <a href="{% url 'species_detail' jbrowse_tax.ncbi_taxonomy_id|default:jbrowse_tax.species %}" class="btn btn-outline-primary">Export species</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% now "U" as cachebust %}
+    {% with config_url='/jbrowse-config/?data='|add:jbrowse_data %}
+        {% if jbrowse_track %}
+            {% with config_url=config_url|add:'&track='|add:jbrowse_track %}
+                {% with config_param=config_url|urlencode %}
+                    {% if jbrowse_app_url %}
+                        <div class="jbrowse-viewer">
+                            <iframe
+                                src="{{ jbrowse_app_url }}?cachebust={{ cachebust }}&config={{ config_param }}{% if jbrowse_loc %}&loc={{ jbrowse_loc|urlencode }}{% endif %}"
+                                width="100%"
+                                height="900"
+                                frameborder="0"
+                                style="min-height:900px; border:none;"
+                                loading="eager"
+                            ></iframe>
+                        </div>
+                    {% elif jbrowse_js_url and fasta_url %}
+                        <div id="jbrowse-root" class="jbrowse-viewer"></div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            JBrowse cannot initialize because the viewer build or configuration is missing.
+                            Ensure the JBrowse web build is installed under <code>static/jbrowse</code>.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            {% endwith %}
+        {% else %}
+            {% if jbrowse_loc %}
+                {% with config_param=config_url|urlencode %}
+                    {% if jbrowse_app_url %}
+                        <div class="jbrowse-viewer">
+                            <iframe
+                                src="{{ jbrowse_app_url }}?cachebust={{ cachebust }}&config={{ config_param }}&loc={{ jbrowse_loc|urlencode }}"
+                                width="100%"
+                                height="900"
+                                frameborder="0"
+                                style="min-height:900px; border:none;"
+                                loading="eager"
+                            ></iframe>
+                        </div>
+                    {% elif jbrowse_js_url and fasta_url %}
+                        <div id="jbrowse-root" class="jbrowse-viewer"></div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            JBrowse cannot initialize because the viewer build or configuration is missing.
+                            Ensure the JBrowse web build is installed under <code>static/jbrowse</code>.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            {% else %}
+                {% with config_param=config_url|urlencode %}
+                    {% if jbrowse_app_url %}
+                        <div class="jbrowse-viewer">
+                            <iframe
+                                src="{{ jbrowse_app_url }}?cachebust={{ cachebust }}&config={{ config_param }}"
+                                width="100%"
+                                height="720"
+                                frameborder="0"
+                                style="min-height:720px; border:none;"
+                                loading="eager"
+                            ></iframe>
+                        </div>
+                    {% elif jbrowse_js_url and fasta_url %}
+                        <div id="jbrowse-root" class="jbrowse-viewer"></div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            JBrowse cannot initialize because the viewer build or configuration is missing.
+                            Ensure the JBrowse web build is installed under <code>static/jbrowse</code>.
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+        {% endif %}
+    {% endwith %}
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+{% if jbrowse_js_url and fasta_url %}
+<script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+<script src="{{ jbrowse_js_url }}"></script>
+<script>
+    function parseLocation(loc) {
+        if (!loc) {
+            return null;
+        }
+        const parts = loc.split(':');
+        if (parts.length !== 2) {
+            return null;
+        }
+        const refName = parts[0];
+        const rangeParts = parts[1].split('..');
+        if (rangeParts.length !== 2) {
+            return null;
+        }
+        const start = Number(rangeParts[0]);
+        const end = Number(rangeParts[1]);
+        if (!Number.isFinite(start) || !Number.isFinite(end)) {
+            return null;
+        }
+        return { refName, start, end };
+    }
+
+    function clearJBrowseStorage() {
+        try {
+            if (window.sessionStorage) {
+                const keys = [];
+                for (let i = 0; i < sessionStorage.length; i += 1) {
+                    const key = sessionStorage.key(i);
+                    if (key && (key.includes('current') || key.toLowerCase().includes('jbrowse') || key.toLowerCase().includes('session'))) {
+                        keys.push(key);
+                    }
+                }
+                keys.forEach((key) => sessionStorage.removeItem(key));
+            }
+            if (window.localStorage) {
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i += 1) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('current') || key.toLowerCase().includes('jbrowse') || key.toLowerCase().includes('session'))) {
+                        keys.push(key);
+                    }
+                }
+                keys.forEach((key) => localStorage.removeItem(key));
+            }
+        } catch (e) {
+            console.warn('Failed to clear JBrowse storage', e);
+        }
+    }
+
+    async function clearIndexedDB() {
+        if (!window.indexedDB) {
+            return;
+        }
+        try {
+            if (indexedDB.databases) {
+                const dbs = await indexedDB.databases();
+                dbs.forEach((db) => {
+                    if (db && db.name && (db.name.toLowerCase().includes('jbrowse') || db.name === 'sessionsDB')) {
+                        indexedDB.deleteDatabase(db.name);
+                    }
+                });
+            } else {
+                indexedDB.deleteDatabase('sessionsDB');
+            }
+        } catch (e) {
+            console.warn('Failed to clear JBrowse IndexedDB', e);
+        }
+    }
+
+    async function initJBrowse() {
+        clearJBrowseStorage();
+        await clearIndexedDB();
+
+        const rootEl = document.getElementById('jbrowse-root');
+        if (!rootEl) {
+            return;
+        }
+
+        const JBrowseWeb = window['@jbrowse/web'] || window.JBrowseWeb || window.JBrowse;
+        if (!JBrowseWeb || !window.React || !window.ReactDOM) {
+            return;
+        }
+
+        const fastaUrl = '{{ fasta_url|default:"" }}';
+        const gffUrl = '{{ gff_url|default:"" }}';
+        const adapterType = '{{ fasta_adapter_type|default:"IndexedFastaAdapter" }}';
+        const gffAdapterType = '{{ gff_adapter_type|default:"Gff3Adapter" }}';
+        const faiUrl = '{{ fai_url|default:"" }}';
+        const gziUrl = '{{ gzi_url|default:"" }}';
+        const gffIndexUrl = '{{ gff_index_url|default:"" }}';
+        const loc = parseLocation('{{ jbrowse_loc|default:"" }}');
+
+        const fastaAdapterConfig = {
+            type: adapterType,
+            fastaLocation: { uri: fastaUrl, locationType: 'UriLocation' },
+        };
+        if (adapterType === 'IndexedFastaAdapter' && faiUrl) {
+            fastaAdapterConfig.faiLocation = { uri: faiUrl, locationType: 'UriLocation' };
+        }
+        if (adapterType === 'BgzipFastaAdapter') {
+            if (faiUrl) {
+                fastaAdapterConfig.faiLocation = { uri: faiUrl, locationType: 'UriLocation' };
+            }
+            if (gziUrl) {
+                fastaAdapterConfig.gziLocation = { uri: gziUrl, locationType: 'UriLocation' };
+            }
+        }
+
+        const assemblyConfig = {
+            name: 'assembly1',
+            sequence: {
+                type: 'ReferenceSequenceTrack',
+                trackId: 'referenceSequenceTrack',
+                adapter: fastaAdapterConfig,
+            },
+        };
+
+        const trackName = '{{ jbrowse_track_name|default:"Genome annotation" }}';
+
+        const buildFeatureAdapter = () => {
+            if (gffAdapterType === 'GtfAdapter') {
+                return {
+                    type: gffAdapterType,
+                    gtfLocation: { uri: gffUrl, locationType: 'UriLocation' },
+                };
+            }
+            if (gffAdapterType === 'Gff3TabixAdapter') {
+                return {
+                    type: gffAdapterType,
+                    gffGzLocation: { uri: gffUrl, locationType: 'UriLocation' },
+                    index: { location: { uri: gffIndexUrl, locationType: 'UriLocation' } },
+                };
+            }
+            return {
+                type: gffAdapterType,
+                gffLocation: { uri: gffUrl, locationType: 'UriLocation' },
+            };
+        };
+
+        const viewConfig = {
+            id: 'linearGenomeView',
+            type: 'LinearGenomeView',
+            assemblyName: 'assembly1',
+            tracks: [
+                {
+                    configuration: 'annotationTrack',
+                },
+            ],
+            displayedRegions: loc ? [{ assemblyName: 'assembly1', refName: loc.refName, start: loc.start, end: loc.end }] : [],
+        };
+
+        const config = {
+            assemblies: [assemblyConfig],
+            tracks: [
+                {
+                    type: 'FeatureTrack',
+                    trackId: 'annotationTrack',
+                    name: trackName,
+                    assemblyNames: ['assembly1'],
+                    adapter: buildFeatureAdapter(),
+                },
+            ],
+            defaultSession: {
+                name: 'Default session',
+                views: [viewConfig],
+            },
+        };
+
+        const jbrowsePluginUrl = '{{ jbrowse_plugin_url|default:"" }}';
+        if (jbrowsePluginUrl) {
+            config.plugins = [{ name: 'UMDUrlPlugin', umdUrl: jbrowsePluginUrl }];
+        }
+
+        const element = window.React.createElement(JBrowseWeb.JBrowse || JBrowseWeb.default || JBrowseWeb, { config });
+        if (window.ReactDOM.createRoot) {
+            window.ReactDOM.createRoot(rootEl).render(element);
+        } else {
+            window.ReactDOM.render(element, rootEl);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', initJBrowse);
+</script>
+{% endif %}
+{% if species_list and not jbrowse_data %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.jQuery && window.jQuery.fn.DataTable) {
+            $('#jbrowseGenomeTable').DataTable({
+                pageLength: 20,
+                order: [[3, 'asc']],
+                dom: '<"d-flex flex-column flex-md-row justify-content-between align-items-center mb-3"<"d-flex align-items-center"l><"d-flex align-items-center"f>>t<"d-flex flex-column flex-md-row justify-content-between align-items-center mt-3"<"mb-2 mb-md-0"i><p>>',
+                language: {
+                    search: 'Search:',
+                    lengthMenu: 'Rows per page _MENU_',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ entries'
+                }
+            });
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Submission Details - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold">Submission Details</h2>
+        <p class="lead text-white-75">View the submitted proposal and its current review status.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4">
+        <div class="mb-4">
+            <a href="/submit/" class="btn btn-outline-secondary">Back to Submit Page</a>
+        </div>
+        <table class="table table-bordered mb-4">
+            <tbody>
+                <tr>
+                    <th scope="row">Submission Title</th>
+                    <td>{{ submission.title }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Data Type</th>
+                    <td>{{ submission.get_data_type_display }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Submitter</th>
+                    <td>{{ submission.submitter_name|default:'Anonymous' }}{% if submission.submitter_email %} ({{ submission.submitter_email }}){% endif %}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Source URL</th>
+                    <td>
+                        {% if submission.source_url %}
+                            {% if submission.source_url|slice:":4" == "http" %}
+                                <a href="{{ submission.source_url }}" target="_blank">{{ submission.source_url }}</a>
+                            {% else %}
+                                {{ submission.source_url }}
+                            {% endif %}
+                        {% else %}
+                            None
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Uploaded Files</th>
+                    <td>
+                        {% if submission.uploaded_files %}
+                            <ul class="mb-0">
+                                {% for filename in submission.uploaded_files %}
+                                    <li>{{ filename }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            None
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Details</th>
+                    <td><pre class="mb-0">{{ submission.details }}</pre></td>
+                </tr>
+                <tr>
+                    <th scope="row">Current Status</th>
+                    <td>{{ submission.get_status_display }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Admin Note</th>
+                    <td>{% if submission.admin_note %}<pre class="mb-0">{{ submission.admin_note }}</pre>{% else %}None{% endif %}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Submitted At</th>
+                    <td>{{ submission.submitted_at }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">View Link</th>
+                    <td><a href="{{ request.build_absolute_uri }}">{{ request.build_absolute_uri }}</a></td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if show_admin_form %}
+            <div class="card p-4 mb-4">
+                <h3 class="h5">Review / Update Status</h3>
+                {% if update_message %}
+                    <div class="alert alert-success">{{ update_message }}</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select id="status" name="status" class="form-select">
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if submission.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="admin_note" class="form-label">Admin Note</label>
+                        <textarea id="admin_note" name="admin_note" class="form-control" rows="5" placeholder="Add review comments or notes here.">{{ submission.admin_note }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Review</button>
+                </form>
+            </div>
+        {% else %}
+            <div class="alert alert-secondary mb-4">
+                Submission status updates are managed by administrators only.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1460 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title }} - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <h2 class="fw-bold"><i>{{ dataset.species }}</i></h2>
+        <p class="lead text-white-75">Single-cell atlas for <i>{{ dataset.species }}</i> with cluster details and marker gene summary.</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="dashboard-section p-4 h-100">
+                <h3 class="h6 fw-bold mb-3">Dataset summary</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-borderless text-secondary mb-0">
+                        <tbody>
+                            <tr>
+                                <th class="pe-3 text-start">Class</th>
+                                <td>{{ dataset.class_name|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Order</th>
+                                <td>{{ dataset.order|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Family</th>
+                                <td>{{ dataset.family|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Species</th>
+                                <td>
+                                    {% if dataset.taxonomy %}
+                                        <a href="{% url 'species_detail' taxonomy_id=dataset.taxonomy.ncbi_taxonomy_id|default:dataset.taxonomy.species %}" class="text-decoration-none"><i>{{ dataset.species }}</i></a>
+                                    {% else %}
+                                        <i>{{ dataset.species }}</i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Directory</th>
+                                <td>{{ dataset.dir|default:'species-level single-cell directory' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Tissue</th>
+                                <td>{{ dataset.tissue|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Stage</th>
+                                <td>{{ dataset.stage|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Clusters</th>
+                                <td>{{ dataset.clusters|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Cells</th>
+                                <td>{{ dataset.cells|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Type</th>
+                                <td>{{ dataset.type|default:'-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="pe-3 text-start">Year</th>
+                                <td>{{ dataset.year|default:'-' }}</td>
+                            </tr>
+                            {% if dataset.platform %}
+                            <tr>
+                                <th class="pe-3 text-start">Platform</th>
+                                <td>{{ dataset.platform }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if dataset.study %}
+                            <tr>
+                                <th class="pe-3 text-start">Study</th>
+                                <td>{{ dataset.study }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if dataset.bioproject %}
+                            <tr>
+                                <th class="pe-3 text-start">BioProject</th>
+                                <td><a href="https://www.ncbi.nlm.nih.gov/bioproject/{{ dataset.bioproject }}" target="_blank" rel="noopener noreferrer">{{ dataset.bioproject }}</a></td>
+                            </tr>
+                            {% endif %}
+                            {% if dataset.journal %}
+                            <tr>
+                                <th class="pe-3 text-start">Journal</th>
+                                <td><i>{{ dataset.journal }}</i></td>
+                            </tr>
+                            {% endif %}
+                            {% if dataset.doi %}
+                            <tr>
+                                <th class="pe-3 text-start">DOI</th>
+                                <td><a href="https://doi.org/{{ dataset.doi }}" target="_blank" rel="noopener noreferrer">{{ dataset.doi }}</a></td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="/singlecell/" class="btn btn-outline-secondary w-100">← Back to Single-cell</a>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="dashboard-section p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">Cluster visualization</h3>
+                        <p class="text-muted mb-0">Interactive UMAP visualization of the single-cell dataset.</p>
+                    </div>
+                    {% if umap_dataset %}
+                    <div class="d-flex flex-column align-items-end gap-2 text-end text-secondary small" id="umapClusterControl">
+                        <div><span>Dataset: {{ umap_dataset.label }}</span></div>
+                        <div id="umapClusterControlContent" class="d-flex flex-column align-items-end"></div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if umap_dataset or cluster_image_url %}
+                <div class="row g-3">
+                    <div class="col-12">
+                        {% if cluster_image_url and not umap_dataset %}
+                        <div class="text-center">
+                            <img src="{{ cluster_image_url }}" alt="{{ cluster_image_filename }} cluster visualization" class="img-fluid rounded-3 border" style="max-height: 620px; width: auto;">
+                            <div class="text-muted small mt-2">Static cluster visualization: {{ cluster_image_filename }}</div>
+                        </div>
+                        {% else %}
+                        <div id="umapClusterChart" class="rounded-4 border border-secondary bg-light" style="min-height: 420px; width:100%;"></div>
+                        <div id="umapMessage" class="text-secondary small mt-2"></div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="rounded-4 border border-secondary bg-light d-flex align-items-center justify-content-center" style="border-style: dashed; min-height: 420px;">
+                    <div class="text-center text-secondary px-4">
+                        <i class="fas fa-chart-scatter fa-3x mb-3"></i>
+                        <p class="mb-0">Cluster visualization space</p>
+                        <p class="small text-muted">UMAP/T-SNE plot not available for this dataset.</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+    <div class="dashboard-section p-4 border-start border-warning border-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+            <div>
+                <h3 class="h6 fw-bold mb-1">Download Bar</h3>
+                <p class="text-muted mb-0">Select available files and add them to the Download Bar for later download.</p>
+            </div>
+            <div class="form-check form-switch mt-2 mt-md-0">
+                <input class="form-check-input" type="checkbox" id="singlecellDownloadFilesSelectAll">
+                <label class="form-check-label" for="singlecellDownloadFilesSelectAll">Select all</label>
+            </div>
+            <button type="button" id="singlecellDownloadFilesBtn" class="btn btn-primary btn-sm">Add Selected to Download Bar</button>
+        </div>
+        <div class="row g-3">
+            {% if umap_dataset or cluster_image_url %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input singlecell-download-file-checkbox" type="checkbox" id="singlecellDownloadCheckboxUmap" data-file-path="{{ umap_dataset.url }}" data-file-label="UMAP.csv" style="width:1.25em; height:1.25em;">
+                            <label class="form-check-label fw-semibold ms-2" for="singlecellDownloadCheckboxUmap">UMAP.csv</label>
+                        </div>
+                        <div class="text-muted small mt-2">UMAP coordinates file.</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if expression_file_url %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input singlecell-download-file-checkbox" type="checkbox" id="singlecellDownloadCheckboxExpression" data-file-path="{{ expression_file_url }}" data-file-label="{{ expression_file_filename }}" style="width:1.25em; height:1.25em;">
+                            <label class="form-check-label fw-semibold ms-2" for="singlecellDownloadCheckboxExpression">{{ expression_file_filename }}</label>
+                        </div>
+                        <div class="text-muted small mt-2">Gene expression matrix.</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if markers_file_url %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input singlecell-download-file-checkbox" type="checkbox" id="singlecellDownloadCheckboxMarkers" data-file-path="{{ markers_file_url }}" data-file-label="Markers.csv" style="width:1.25em; height:1.25em;">
+                            <label class="form-check-label fw-semibold ms-2" for="singlecellDownloadCheckboxMarkers">Markers.csv</label>
+                        </div>
+                        <div class="text-muted small mt-2">Marker gene summary.</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if cluster_image_url %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input singlecell-download-file-checkbox" type="checkbox" id="singlecellDownloadCheckboxClusterImage" data-file-path="{{ cluster_image_url }}" data-file-label="{{ cluster_image_filename }}" style="width:1.25em; height:1.25em;">
+                            <label class="form-check-label fw-semibold ms-2" for="singlecellDownloadCheckboxClusterImage">{{ cluster_image_filename }}</label>
+                        </div>
+                        <div class="text-muted small mt-2">Static UMAP/tSNE cluster visualization.</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% for rds_file in rds_files %}
+            <div class="col-12 col-sm-6 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="form-check">
+                            <input class="form-check-input singlecell-download-file-checkbox" type="checkbox" id="singlecellDownloadCheckboxRds{{ forloop.counter }}" data-file-path="{{ rds_file.url }}" data-file-label="{{ rds_file.filename }}" style="width:1.25em; height:1.25em;">
+                            <label class="form-check-label fw-semibold ms-2" for="singlecellDownloadCheckboxRds{{ forloop.counter }}">{{ rds_file.filename }}</label>
+                        </div>
+                        <div class="text-muted small mt-2">RDS single-cell dataset file.</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not umap_dataset and not expression_file_url and not markers_file_url and not rds_files %}
+            <div class="col-12">
+                <div class="alert alert-secondary mb-0">No dataset files available for download.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="row g-4 mt-4 align-items-stretch">
+        <div class="col-lg-4 d-flex">
+            <div class="dashboard-section p-4 h-100 d-flex flex-column" style="min-height: 720px; max-height: 720px; width: 100%; overflow: hidden;">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">Marker genes by cluster</h3>
+                    </div>
+                </div>
+                {% if markers_file_url %}
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="markerClusterSelect" class="mb-0 small text-secondary">Cluster:</label>
+                        <select id="markerClusterSelect" class="form-select form-select-sm"></select>
+                    </div>
+                </div>
+                <div class="d-flex flex-column" id="markerTableWrapper" style="flex: 1 1 auto; min-height: 0; overflow: hidden;">
+                    <div class="table-responsive" style="flex: 0 0 auto;">
+                        <table class="table table-bordered table-striped align-middle mb-0" style="min-height: 0;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Gene</th>
+                                    <th class="text-end">p_val_adj</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                    <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+                        <table class="table table-bordered table-striped align-middle mb-0 mb-0">
+                            <tbody id="markerTableBody">
+                                <tr>
+                                    <td colspan="2" class="text-center text-secondary py-4">Loading marker genes...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="small text-muted mt-2">Source: <a href="{{ markers_file_url }}" target="_blank" rel="noopener noreferrer">Markers.csv</a></div>
+                {% else %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Gene</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if marker_genes %}
+                                {% for marker in marker_genes %}
+                                <tr>
+                                    <td>{{ marker.genes }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td class="text-center text-muted py-4">Marker gene information is not available for this dataset.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-8 d-flex">
+            <div class="dashboard-section p-4 h-100 d-flex flex-column" style="min-height: 720px; max-height: 720px; width: 100%;">
+                {% if expression_file_url %}
+                <div class="d-flex justify-content-between align-items-start mb-3 flex-shrink-0">
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">Gene expression {% if has_umap_coordinates %}UMAP{% else %}by cluster{% endif %}</h3>
+                        <p class="text-muted mb-0">Select a gene to display its expression across clusters.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="expressionGroupingSelect" class="small text-secondary text-nowrap">Group by</label>
+                        <select id="expressionGroupingSelect" class="form-select form-select-sm">
+                            <option value="cluster">Cluster</option>
+                            <option value="celltype">Celltype</option>
+                            <option value="stage">Stage</option>
+                            <option value="cluster_celltype">Cluster + Celltype</option>
+                            <option value="cluster_stage">Cluster + Stage</option>
+                        </select>
+                    </div>
+                    <div id="expressionStatus" class="small text-secondary"></div>
+                </div>
+                <div class="d-flex flex-column flex-grow-1" style="min-height: 0; overflow: hidden;">
+                    {% if has_umap_coordinates %}<div id="umapExpressionChart" class="rounded-4 border border-secondary bg-light" style="height: calc(50% - 10px); width:100%;"></div>{% endif %}
+                    <div id="umapExpressionMessage" class="text-secondary small mt-2 mb-2 flex-shrink-0"></div>
+                    <div id="expressionViolinChart" class="rounded-4 border border-secondary bg-light mt-0" style="height: {% if has_umap_coordinates %}calc(50% - 10px){% else %}100%{% endif %}; width:100%;"></div>
+                    <div id="expressionViolinMessage" class="text-secondary small mt-2 flex-shrink-0" style="display:none;"></div>
+                </div>
+                {% else %}
+                <div class="rounded-4 border border-secondary bg-light d-flex align-items-center justify-content-center" style="border-style: dashed; min-height: 420px;">
+                    <div class="text-center text-secondary px-4">
+                        <p class="mb-0">Gene expression UMAP is not available for this dataset.</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="row g-4 mt-4">
+        <div class="col-12">
+            <div class="dashboard-section p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">Functional Annotation</h3>
+                        <p class="text-muted mb-0">View functional annotation details for the selected marker gene.</p>
+                    </div>
+                </div>
+                <div id="geneAnnotationContent" class="rounded-4 border border-secondary bg-light p-4 text-secondary">
+                    Click a gene in the marker table to load expression and functional annotation.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+{% if umap_dataset or markers_file_url or expression_file_url %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+    {% if umap_dataset %}
+    const umapDataUrl = '{{ umap_dataset.url }}';
+    {% else %}
+    const umapDataUrl = '';
+    {% endif %}
+    const markersFileUrl = '{{ markers_file_url|default:"" }}';
+    const expressionCsvUrl = '{{ expression_file_url|default:"" }}';
+    const expressionFolderUrl = '{{ expression_folder_url|default:"" }}';
+    const expressionFolderReady = {{ expression_folder_ready|yesno:"true,false" }};
+    const annotationTaxonomyId = '{{ dataset.taxonomy.ncbi_taxonomy_id|default:""|escapejs }}';
+    const annotationSpecies = '{{ dataset.species|default:""|escapejs }}';
+    const expressionGenerationQueued = {{ expression_generation_queued|yesno:"true,false" }};
+    let umapChart = null;
+    let umapExpressionChart = null;
+    let violinChart = null;
+    let umapGroups = {};
+    let barcodeClusterMap = {};
+    let cellCoordinates = {};
+    let currentHighlightedCluster = null;
+    let selectedMarkerGene = null;
+    let selectedMarkerGeneCluster = null;
+    let geneExpressionRows = [];
+    let expressionMin = null;
+    let expressionMax = null;
+    let expressionLoad = null;
+    let expressionLoaded = false;
+    let expressionGrouping = 'cluster';
+    let markerGroups = {};
+    let markerGeneClusterMap = {};
+    let markerColumns = [];
+    let markerDataLoaded = false;
+    let currentMarkerCluster = null;
+    let perGeneExpressionCache = {};
+    let perGeneExpressionLoad = {};
+
+    function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let value = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i += 1) {
+            const char = text[i];
+            if (inQuotes) {
+                if (char === '"') {
+                    if (text[i + 1] === '"') {
+                        value += '"';
+                        i += 1;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    value += char;
+                }
+            } else if (char === '"') {
+                inQuotes = true;
+            } else if (char === ',') {
+                row.push(value);
+                value = '';
+            } else if (char === '\r') {
+                continue;
+            } else if (char === '\n') {
+                row.push(value);
+                rows.push(row);
+                row = [];
+                value = '';
+            } else {
+                value += char;
+            }
+        }
+        if (value !== '' || row.length) {
+            row.push(value);
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    function getExpressionColor(value) {
+        if (value == null || expressionMin == null || expressionMax == null || expressionMin === expressionMax) {
+            return null;
+        }
+        const ratio = Math.max(0, Math.min(1, (value - expressionMin) / (expressionMax - expressionMin)));
+        const start = [240, 240, 240];
+        const middle = [255, 200, 0];
+        const end = [204, 12, 41];
+        const color = ratio < 0.5
+            ? start.map((c, i) => Math.round(c + (middle[i] - c) * (ratio * 2)))
+            : middle.map((c, i) => Math.round(c + (end[i] - c) * ((ratio - 0.5) * 2)));
+        return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    }
+
+    function buildUmapSeries(groups, highlightCluster, selectedGeneCluster) {
+        const activeCluster = highlightCluster || selectedGeneCluster;
+        return Object.keys(groups).map(name => ({
+            name,
+            type: 'scatter',
+            data: groups[name].map(point => ({ value: [point.x, point.y, point.label], barcode: point.barcode, cluster: point.cluster })),
+            symbolSize: activeCluster === name ? 10 : 5,
+            itemStyle: {
+                opacity: activeCluster && activeCluster !== name ? 0.15 : 1,
+            },
+            emphasis: { focus: 'series' }
+        }));
+    }
+
+    function getGeneCsvFilename(gene) {
+        return gene
+            .replace(/[^a-zA-Z0-9_.\-]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^[_\.\-]+|[_\.\-]+$/g, '') || 'unnamed_gene';
+    }
+
+    function getExpressionCsvUrl(gene) {
+        if (!expressionFolderUrl || !gene) {
+            return '';
+        }
+        const filename = `${getGeneCsvFilename(gene)}.csv`;
+        return `${expressionFolderUrl}${encodeURIComponent(filename)}`;
+    }
+
+    function buildExpressionSeries(groups) {
+        const background = [];
+        Object.keys(groups).forEach(name => {
+            groups[name].forEach(point => {
+                const x = point.x;
+                const y = point.y;
+                if (Number.isFinite(x) && Number.isFinite(y)) {
+                    background.push([x, y, null]);
+                }
+            });
+        });
+        const series = [{
+            name: 'All cells',
+            type: 'scatter',
+            data: background,
+            symbolSize: 4,
+            itemStyle: { color: 'rgba(200,200,200,0.25)' },
+            emphasis: { focus: 'series' },
+            tooltip: { show: false }
+        }];
+        if (geneExpressionRows.length) {
+            series.push({
+                name: 'Expression',
+                type: 'scatter',
+                data: geneExpressionRows.map(point => [point.x, point.y, point.value, point.barcode || '', point.cluster || '']),
+                symbolSize: 6,
+                encode: { x: 0, y: 1, tooltip: [0, 1, 2], value: 2 },
+                emphasis: { focus: 'series' },
+                tooltip: {
+                    formatter: params => {
+                        const [x, y, value, barcode, cluster] = params.data || [];
+                        let text = `Expression<br/>UMAP1: ${Number(x).toFixed(3)}<br/>UMAP2: ${Number(y).toFixed(3)}`;
+                        if (value != null) {
+                            text += `<br/>Value: ${Number(value).toFixed(3)}`;
+                        }
+                        if (barcode) {
+                            text += `<br/>Barcode: ${barcode}`;
+                        }
+                        if (cluster) {
+                            text += `<br/>Cluster: ${cluster}`;
+                        }
+                        return text;
+                    }
+                }
+            });
+        }
+        return series;
+    }
+
+    function createClusterButton(clusterName) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-sm btn-outline-secondary';
+        button.textContent = clusterName;
+        button.addEventListener('click', () => {
+            currentHighlightedCluster = clusterName;
+            updateUmapHighlight();
+            const active = document.querySelectorAll('#umapClusterControlContent .btn-active');
+            active.forEach(el => el.classList.remove('btn-active', 'btn-secondary'));
+            button.classList.add('btn-active', 'btn-secondary');
+        });
+        return button;
+    }
+
+    function populateUmapClusterControl(clusterNames) {
+        const control = document.getElementById('umapClusterControlContent');
+        if (!control) {
+            return;
+        }
+        control.innerHTML = '';
+        if (!clusterNames.length) {
+            return;
+        }
+        if (clusterNames.length < 10) {
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'd-flex flex-wrap gap-2 justify-content-end';
+            const allButton = document.createElement('button');
+            allButton.type = 'button';
+            allButton.className = 'btn btn-sm btn-outline-secondary';
+            allButton.textContent = 'Show all';
+            allButton.addEventListener('click', () => {
+                currentHighlightedCluster = null;
+                selectedMarkerGene = null;
+                selectedMarkerGeneCluster = null;
+                setGeneAnnotation(null);
+                updateUmapHighlight();
+                document.querySelectorAll('#umapClusterControlContent .btn-active').forEach(el => el.classList.remove('btn-active', 'btn-secondary'));
+            });
+            buttonGroup.appendChild(allButton);
+            clusterNames.forEach(name => buttonGroup.appendChild(createClusterButton(name)));
+            control.appendChild(buttonGroup);
+        } else {
+            const select = document.createElement('select');
+            select.id = 'umapClusterSelect';
+            select.className = 'form-select form-select-sm';
+            select.innerHTML = '<option value="">Show all clusters</option>' + clusterNames.map(name => `<option value="${name}">${name}</option>`).join('');
+            select.addEventListener('change', event => {
+                currentHighlightedCluster = event.target.value || null;
+                updateUmapHighlight();
+            });
+            control.appendChild(select);
+        }
+    }
+
+    function setGeneAnnotation(gene) {
+        const annotationEl = document.getElementById('geneAnnotationContent');
+        if (!annotationEl) {
+            return;
+        }
+        if (!gene) {
+            annotationEl.innerHTML = 'Select a marker gene to view functional annotation details here.';
+            return;
+        }
+        annotationEl.innerHTML = '<div class="text-center text-muted">Loading functional annotation...</div>';
+        fetchGeneAnnotation(gene)
+            .then(data => {
+                annotationEl.innerHTML = renderAnnotationHtml(data);
+            })
+            .catch(error => {
+                annotationEl.innerHTML = `<div class="alert alert-danger">Unable to load annotation: ${error.message}</div>`;
+            });
+    }
+
+    let expressionDataByGene = {};
+    let expressionSelectionRequestId = 0;
+
+    function loadExpressionMatrix() {
+        expressionDataByGene = {};
+        const statusEl = document.getElementById('expressionStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Loading expression matrix...';
+        }
+        if (!expressionCsvUrl) {
+            if (statusEl) {
+                statusEl.textContent = 'Expression CSV not available for this dataset.';
+            }
+            return Promise.resolve();
+        }
+        return fetch(expressionCsvUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Expression CSV not found: ${expressionCsvUrl}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                const rows = parseCsv(text).filter(r => r.length);
+                if (rows.length < 2) {
+                    throw new Error('Expression CSV file is empty or invalid.');
+                }
+                const header = rows[0].map(h => h.trim());
+                const geneIndex = header.findIndex(h => /^Gene[_ ]?ID$/i.test(h));
+                const barcodeIndex = header.findIndex(h => /^Cell[_ ]?Barcode$/i.test(h));
+                const clusterIndex = header.findIndex(h => /^Cluster$/i.test(h));
+                const celltypeIndex = header.findIndex(h => /^Celltype$/i.test(h));
+                const stageIndex = header.findIndex(h => /^Stage$/i.test(h));
+                const expressionIndex = header.findIndex(h => /Expression[_ ]?Value/i.test(h));
+                if (geneIndex === -1 || barcodeIndex === -1 || expressionIndex === -1) {
+                    throw new Error('Expression CSV missing expected Gene_ID, Cell_Barcode, or Expression_Value columns.');
+                }
+                rows.slice(1).forEach(row => {
+                    const gene = (row[geneIndex] || '').trim();
+                    const barcode = (row[barcodeIndex] || '').trim();
+                    const value = parseFloat((row[expressionIndex] || '').trim());
+                    if (!gene || !barcode || !Number.isFinite(value)) {
+                        return;
+                    }
+                    expressionDataByGene[gene] = expressionDataByGene[gene] || [];
+                    const cluster = clusterIndex >= 0 ? (row[clusterIndex] || '').trim() : '';
+                    const celltype = celltypeIndex >= 0 ? (row[celltypeIndex] || '').trim() : '';
+                    const stage = stageIndex >= 0 ? (row[stageIndex] || '').trim() : '';
+                    expressionDataByGene[gene].push({ barcode, value, cluster, celltype, stage });
+                });
+                const geneCount = Object.keys(expressionDataByGene).length;
+                if (statusEl) {
+                    statusEl.textContent = `Expression matrix loaded (${geneCount} genes).`;
+                }
+            })
+            .catch(error => {
+                console.error('Failed to load Expression CSV:', error);
+                if (statusEl) {
+                    statusEl.textContent = `Expression load failed: ${error.message}`;
+                }
+            });
+    }
+
+    function getExpressionCsvFilenameCandidates(gene) {
+        const candidates = new Set();
+        const exactName = getGeneCsvFilename(gene);
+        if (exactName) {
+            candidates.add(`${exactName}.csv`);
+        }
+        const match = gene.match(/^(.*?)(\.(\d+))$/);
+        if (match && match[3].length > 1) {
+            const base = match[1];
+            const digits = match[3];
+            for (let len = digits.length - 1; len >= 1; len -= 1) {
+                candidates.add(`${getGeneCsvFilename(`${base}.${digits.slice(0, len)}`)}.csv`);
+            }
+        }
+        const underscoreParts = gene.split('_');
+        if (underscoreParts.length > 1) {
+            const lastPart = underscoreParts[underscoreParts.length - 1];
+            const dotMatch = lastPart.match(/^(\d+)\.(\d+)$/);
+            if (dotMatch) {
+                const prefix = underscoreParts.slice(0, -1).concat([dotMatch[1]]).join('_');
+                candidates.add(`${getGeneCsvFilename(prefix)}.csv`);
+            }
+        }
+        return Array.from(candidates);
+    }
+
+    function loadExpressionCsvForGene(gene) {
+        if (!expressionFolderUrl) {
+            return Promise.reject(new Error('No per-gene expression folder URL available.'));
+        }
+        if (perGeneExpressionLoad[gene]) {
+            return perGeneExpressionLoad[gene];
+        }
+        const statusEl = document.getElementById('expressionStatus');
+        if (statusEl) {
+            statusEl.textContent = `Loading expression data for ${gene}...`;
+        }
+        const filenames = getExpressionCsvFilenameCandidates(gene);
+        const tryLoad = index => {
+            if (index >= filenames.length) {
+                return Promise.reject(new Error(`Per-gene expression file not found for ${gene}`));
+            }
+            const filename = filenames[index];
+            const url = `${expressionFolderUrl}${encodeURIComponent(filename)}`;
+            return fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        return tryLoad(index + 1);
+                    }
+                    return response.text().then(text => {
+                        const rows = parseCsv(text).filter(r => r.length);
+                        if (rows.length < 2) {
+                            throw new Error('Expression file is empty or invalid.');
+                        }
+                        const header = rows[0].map(h => h.trim());
+                        const barcodeIndex = header.findIndex(h => /^Cell[_ ]?Barcode$/i.test(h));
+                        const xIndex = header.findIndex(h => /^UMAP[_ ]?1$/i.test(h));
+                        const yIndex = header.findIndex(h => /^UMAP[_ ]?2$/i.test(h));
+                        const clusterIndex = header.findIndex(h => /^Cluster$/i.test(h));
+                        const celltypeIndex = header.findIndex(h => /^Cell[_ ]?type$/i.test(h));
+                        const stageIndex = header.findIndex(h => /^Stage$/i.test(h));
+                        const expressionIndex = header.findIndex(h => /Expression[_ ]?Value/i.test(h));
+                        if (barcodeIndex === -1 || expressionIndex === -1) {
+                            throw new Error('Per-gene expression CSV missing expected Cell_Barcode or Expression_Value columns.');
+                        }
+                        const geneRows = [];
+                        rows.slice(1).forEach(row => {
+                            const barcode = (row[barcodeIndex] || '').trim();
+                            const x = xIndex >= 0 ? parseFloat((row[xIndex] || '').trim()) : null;
+                            const y = yIndex >= 0 ? parseFloat((row[yIndex] || '').trim()) : null;
+                            const value = parseFloat((row[expressionIndex] || '').trim());
+                            if (!barcode || !Number.isFinite(value)) {
+                                return;
+                            }
+                            geneRows.push({
+                                barcode,
+                                x,
+                                y,
+                                value,
+                                cluster: clusterIndex >= 0 ? (row[clusterIndex] || '').trim() : '',
+                                celltype: celltypeIndex >= 0 ? (row[celltypeIndex] || '').trim() : '',
+                                stage: stageIndex >= 0 ? (row[stageIndex] || '').trim() : ''
+                            });
+                        });
+                        perGeneExpressionCache[gene] = geneRows;
+                        return geneRows;
+                    });
+                });
+        };
+        perGeneExpressionLoad[gene] = tryLoad(0).catch(error => {
+            console.error(`Failed to load per-gene expression for ${gene}:`, error);
+            delete perGeneExpressionLoad[gene];
+            throw error;
+        });
+        return perGeneExpressionLoad[gene];
+    }
+
+    function ensureExpressionLoaded() {
+        if (!expressionCsvUrl) {
+            return Promise.resolve();
+        }
+        if (expressionLoad) {
+            return expressionLoad;
+        }
+        const statusEl = document.getElementById('expressionStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Loading gene expression data...';
+        }
+        expressionLoad = loadExpressionMatrix().then(() => {
+            expressionLoaded = true;
+            if (statusEl) {
+                statusEl.textContent = 'Gene expression data loaded.';
+            }
+        }).catch(error => {
+            console.error('Expression matrix load error:', error);
+            if (statusEl) {
+                statusEl.textContent = `Expression load failed: ${error.message}`;
+            }
+        });
+        return expressionLoad;
+    }
+
+    function isPerGenePathAvailable(gene) {
+        if (!expressionFolderUrl) {
+            return false;
+        }
+        const filename = `${getGeneCsvFilename(gene)}.csv`;
+        const path = `${expressionFolderUrl}${encodeURIComponent(filename)}`;
+        return path;
+    }
+
+    function loadExpressionForGene(gene) {
+        const requestId = ++expressionSelectionRequestId;
+        geneExpressionRows = [];
+        expressionMin = null;
+        expressionMax = null;
+        const statusEl = document.getElementById('expressionStatus');
+        if (!gene) {
+            if (statusEl) {
+                statusEl.textContent = 'No gene selected.';
+            }
+            updateUmapHighlight();
+            return;
+        }
+        const processRows = rows => {
+            if (requestId !== expressionSelectionRequestId) {
+                return;
+            }
+            rows.forEach(item => {
+                const coord = item.barcode ? cellCoordinates[item.barcode] : null;
+                const value = item.value;
+                const x = Number.isFinite(item.x) ? item.x : coord && coord.x;
+                const y = Number.isFinite(item.y) ? item.y : coord && coord.y;
+                if (!Number.isFinite(value)) {
+                    return;
+                }
+                geneExpressionRows.push({
+                    x,
+                    y,
+                    value,
+                    cluster: (coord && coord.cluster) || item.cluster || 'Unknown',
+                    celltype: item.celltype || 'Unknown',
+                    stage: item.stage || 'Unknown',
+                    barcode: item.barcode
+                });
+                if (expressionMin === null || value < expressionMin) {
+                    expressionMin = value;
+                }
+                if (expressionMax === null || value > expressionMax) {
+                    expressionMax = value;
+                }
+            });
+            if (statusEl) {
+                statusEl.textContent = geneExpressionRows.length
+                    ? `Loaded ${geneExpressionRows.length} cells for ${gene}.`
+                    : `No mapped cells found for ${gene}.`;
+            }
+            updateUmapHighlight();
+        };
+
+        if (expressionDataByGene[gene] && expressionDataByGene[gene].length) {
+            processRows(expressionDataByGene[gene]);
+            return;
+        }
+
+        loadExpressionCsvForGene(gene)
+            .then(rows => {
+                if (requestId !== expressionSelectionRequestId) {
+                    return;
+                }
+                if (!rows.length) {
+                    if (statusEl) {
+                        statusEl.textContent = `No expression data found for ${gene}.`;
+                    }
+                    updateUmapHighlight();
+                    return;
+                }
+                processRows(rows);
+            })
+            .catch(error => {
+                if (requestId !== expressionSelectionRequestId) {
+                    return;
+                }
+                ensureExpressionLoaded().then(() => {
+                    if (requestId !== expressionSelectionRequestId) {
+                        return;
+                    }
+                    if (expressionDataByGene[gene] && expressionDataByGene[gene].length) {
+                        processRows(expressionDataByGene[gene]);
+                    } else if (statusEl) {
+                        statusEl.textContent = `No expression data found for ${gene}.`;
+                        updateUmapHighlight();
+                    }
+                });
+            });
+    }
+
+    function updateUmapHighlight() {
+        if (umapChart && umapGroups && Object.keys(umapGroups).length) {
+            umapChart.setOption({
+                series: buildUmapSeries(umapGroups, currentHighlightedCluster, selectedMarkerGeneCluster),
+                title: { text: 'UMAP projection', left: 'center' },
+            });
+        }
+        renderExpressionChart();
+    }
+
+    function renderUmapChart() {
+        const chartEl = document.getElementById('umapClusterChart');
+        const messageEl = document.getElementById('umapMessage');
+        const url = umapDataUrl;
+        if (!chartEl || !url) {
+            return Promise.resolve();
+        }
+        if (messageEl) {
+            messageEl.textContent = 'Loading UMAP data...';
+        }
+        const chart = echarts.init(chartEl, null, { renderer: 'canvas' });
+        umapChart = chart;
+        chart.showLoading();
+        return fetch(url)
+            .then(response => response.text())
+            .then(text => {
+                const rows = parseCsv(text).filter(r => r.length);
+                if (rows.length < 2) {
+                    throw new Error('Invalid UMAP CSV file.');
+                }
+                const header = rows[0].map(h => h.trim());
+                const xIndex = header.findIndex(h => /^UMAP_?1$/i.test(h));
+                const yIndex = header.findIndex(h => /^UMAP_?2$/i.test(h));
+                const labelIndex = header.findIndex(h => /Cell[_ ]?Type|Cluster|cell_type/i.test(h));
+                const idIndex = header.findIndex(h => /Cell[_ ]?Barcode|Barcode|cell/i.test(h));
+                if (xIndex === -1 || yIndex === -1) {
+                    throw new Error('UMAP_1/UMAP_2 columns not found.');
+                }
+                const groups = {};
+                rows.slice(1).forEach(row => {
+                    const x = parseFloat((row[xIndex] || '').trim());
+                    const y = parseFloat((row[yIndex] || '').trim());
+                    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+                        return;
+                    }
+                    const cluster = labelIndex >= 0 ? (row[labelIndex] || 'Unknown').trim() : 'Unknown';
+                    const barcode = idIndex >= 0 ? (row[idIndex] || '').trim() : '';
+                    if (barcode) {
+                        barcodeClusterMap[barcode] = cluster;
+                    }
+                    const point = { x, y, label: barcode || cluster, barcode, cluster };
+                    groups[cluster] = groups[cluster] || [];
+                    groups[cluster].push(point);
+                    if (barcode) {
+                        cellCoordinates[barcode] = point;
+                    }
+                });
+                umapGroups = groups;
+                populateUmapClusterControl(Object.keys(groups));
+                const option = {
+                    title: { text: selectedMarkerGene ? `UMAP projection — ${selectedMarkerGene}` : 'UMAP projection', left: 'center' },
+                    legend: { type: 'scroll', orient: 'vertical', right: 10, top: 20, bottom: 20, width: 160, align: 'left', textStyle: { fontSize: 12 } },
+                    grid: { top: 60, right: 180, bottom: 60, left: 60 },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: params => {
+                            const [x, y, label] = params.data.value || params.data;
+                            let text = `${params.seriesName}<br/>UMAP1: ${x.toFixed(3)}<br/>UMAP2: ${y.toFixed(3)}`;
+                            if (label) {
+                                text += `<br/>${label}`;
+                            }
+                            return text;
+                        }
+                    },
+                    xAxis: { name: 'UMAP 1', scale: true, splitLine: { show: false } },
+                    yAxis: { name: 'UMAP 2', scale: true, splitLine: { show: false } },
+                    series: buildUmapSeries(groups, currentHighlightedCluster, selectedMarkerGeneCluster),
+                    dataZoom: [{ type: 'inside' }, { type: 'slider', show: true }],
+                };
+                chart.hideLoading();
+                chart.setOption(option);
+                if (expressionLoaded && selectedMarkerGene) {
+                    loadExpressionForGene(selectedMarkerGene);
+                }
+                if (messageEl) {
+                    messageEl.textContent = 'UMAP loaded successfully.';
+                }
+                window.addEventListener('resize', () => {
+                    chart.resize();
+                    if (umapExpressionChart) {
+                        umapExpressionChart.resize();
+                    }
+                });
+            })
+            .catch(error => {
+                if (messageEl) {
+                    messageEl.textContent = `UMAP load error: ${error.message}`;
+                }
+                chart.hideLoading();
+            });
+    }
+
+    function renderExpressionChart() {
+        const chartEl = document.getElementById('umapExpressionChart');
+        const messageEl = document.getElementById('umapExpressionMessage');
+        if (!chartEl || !umapGroups || !Object.keys(umapGroups).length) {
+            renderViolinChart();
+            return;
+        }
+        if (messageEl) {
+            messageEl.textContent = 'Rendering expression UMAP...';
+        }
+        if (!umapExpressionChart) {
+            umapExpressionChart = echarts.init(chartEl, null, { renderer: 'canvas' });
+        }
+        const min = expressionMin != null ? expressionMin : 0;
+        const max = expressionMax != null ? expressionMax : 1;
+        const rangeMin = min === max ? min - 0.5 : min;
+        const rangeMax = min === max ? max + 0.5 : max;
+        const option = {
+            title: { text: 'Expression UMAP', left: 'center' },
+            tooltip: {
+                trigger: 'item',
+                formatter: params => {
+                    const valueArray = params.data.value || params.data;
+                    const x = valueArray[0];
+                    const y = valueArray[1];
+                    const value = valueArray[2];
+                    let text = `UMAP1: ${Number(x).toFixed(3)}<br/>UMAP2: ${Number(y).toFixed(3)}`;
+                    if (value != null) {
+                        text += `<br/>Expression: ${Number(value).toFixed(3)}`;
+                    }
+                    if (params.data.barcode) {
+                        text += `<br/>Barcode: ${params.data.barcode}`;
+                    }
+                    if (params.data.cluster) {
+                        text += `<br/>Cluster: ${params.data.cluster}`;
+                    }
+                    return text;
+                }
+            },
+            legend: { show: false },
+            grid: { top: 60, right: 180, bottom: 60, left: 60 },
+            visualMap: {
+                type: 'continuous',
+                min: rangeMin,
+                max: rangeMax,
+                dimension: 2,
+                right: 10,
+                top: 20,
+                text: ['High', 'Low'],
+                calculable: true,
+                inRange: { color: ['#f0f0f0', '#fee08b', '#d73027'] }
+            },
+            xAxis: { name: 'UMAP 1', scale: true, splitLine: { show: false } },
+            yAxis: { name: 'UMAP 2', scale: true, splitLine: { show: false } },
+            series: buildExpressionSeries(umapGroups),
+            dataZoom: [{ type: 'inside' }, { type: 'slider', show: true }],
+        };
+        umapExpressionChart.setOption(option);
+        if (messageEl) {
+            if (selectedMarkerGene && geneExpressionRows.length) {
+                messageEl.textContent = `Shown expression for ${selectedMarkerGene}.`;
+            } else if (selectedMarkerGene) {
+                messageEl.textContent = `No expression data found for ${selectedMarkerGene}.`;
+            } else {
+                messageEl.textContent = 'Select a gene to show expression.';
+            }
+        }
+        renderViolinChart();
+    }
+
+    function computeDensity(values, binCount = 20) {
+        const sorted = values.slice().sort((a, b) => a - b);
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        if (min === max) {
+            return [{ value: min, density: 1 }];
+        }
+        const binSize = (max - min) / binCount;
+        const counts = new Array(binCount).fill(0);
+        sorted.forEach(v => {
+            let index = Math.floor((v - min) / binSize);
+            if (index >= binCount) {
+                index = binCount - 1;
+            }
+            if (index < 0) {
+                index = 0;
+            }
+            counts[index] += 1;
+        });
+        const maxCount = Math.max(...counts);
+        return counts.map((count, idx) => ({
+            value: min + (idx + 0.5) * binSize,
+            density: maxCount > 0 ? count / maxCount : 0
+        }));
+    }
+
+    function renderViolinChart() {
+        const chartEl = document.getElementById('expressionViolinChart');
+        const messageEl = document.getElementById('expressionViolinMessage');
+        if (!chartEl) {
+            return;
+        }
+        if (!selectedMarkerGene) {
+            if (violinChart) {
+                violinChart.dispose();
+                violinChart = null;
+            }
+            chartEl.innerHTML = '<div class="p-4 text-center text-secondary">Select a gene to display expression distribution.</div>';
+            if (messageEl) {
+                messageEl.textContent = '';
+            }
+            return;
+        }
+        const clusters = {};
+        geneExpressionRows.forEach(point => {
+            let groupName = point.cluster || 'Unknown';
+            if (expressionGrouping === 'celltype') {
+                groupName = point.celltype || 'Unknown';
+            } else if (expressionGrouping === 'stage') {
+                groupName = point.stage || 'Unknown';
+            } else if (expressionGrouping === 'cluster_celltype') {
+                groupName = `${point.cluster || 'Unknown'} | ${point.celltype || 'Unknown'}`;
+            } else if (expressionGrouping === 'cluster_stage') {
+                groupName = `${point.cluster || 'Unknown'} | ${point.stage || 'Unknown'}`;
+            }
+            clusters[groupName] = clusters[groupName] || [];
+            clusters[groupName].push(point.value);
+        });
+        const clusterNames = Object.keys(clusters).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        if (!clusterNames.length) {
+            if (violinChart) {
+                violinChart.dispose();
+                violinChart = null;
+            }
+            chartEl.innerHTML = '<div class="p-4 text-center text-secondary">No expression values found for the selected gene.</div>';
+            if (messageEl) {
+                messageEl.textContent = '';
+            }
+            return;
+        }
+        function getBoxData(values) {
+            const sorted = values.slice().sort((a, b) => a - b);
+            const q1 = sorted[Math.floor((sorted.length - 1) * 0.25)];
+            const q2 = sorted[Math.floor((sorted.length - 1) * 0.5)];
+            const q3 = sorted[Math.floor((sorted.length - 1) * 0.75)];
+            const min = sorted[0];
+            const max = sorted[sorted.length - 1];
+            return [min, q1, q2, q3, max];
+        }
+        const boxData = clusterNames.map(name => getBoxData(clusters[name]));
+        const scatterData = clusterNames.flatMap((name, idx) => clusters[name].map(value => ({
+            name,
+            value: [idx + (Math.random() - 0.5) * 0.2, value]
+        })));
+        const option = {
+            title: { text: `Expression boxplot — ${selectedMarkerGene}`, left: 'center' },
+            tooltip: {
+                trigger: 'item',
+                formatter: params => {
+                    if (!params) return '';
+                    if (params.seriesType === 'scatter') {
+                        return `${params.seriesName}<br/>Group: ${params.name}<br/>Expression: ${Number(params.value[1]).toFixed(3)}`;
+                    }
+                    if (params.seriesType === 'boxplot') {
+                        return `${params.seriesName}<br/>Group: ${clusterNames[params.dataIndex]}<br/>Min: ${params.value[0].toFixed(3)}<br/>Q1: ${params.value[1].toFixed(3)}<br/>Median: ${params.value[2].toFixed(3)}<br/>Q3: ${params.value[3].toFixed(3)}<br/>Max: ${params.value[4].toFixed(3)}`;
+                    }
+                    return '';
+                }
+            },
+            legend: { data: ['Boxplot', 'Cells'], top: 30 },
+            xAxis: {
+                type: 'category',
+                data: clusterNames,
+                name: 'Expression group',
+                axisLabel: { interval: 0, rotate: 45 }
+            },
+            yAxis: {
+                type: 'value',
+                name: 'Expression',
+                scale: true,
+                splitLine: { show: false }
+            },
+            series: [
+                {
+                    name: 'Boxplot',
+                    type: 'boxplot',
+                    data: boxData,
+                    tooltip: { formatter: null },
+                    itemStyle: { color: 'rgba(92, 116, 191, 0.35)', borderColor: '#5c74bf' }
+                },
+                {
+                    name: 'Cells',
+                    type: 'scatter',
+                    data: scatterData.map(item => ({
+                        name: item.name,
+                        value: item.value,
+                        symbolSize: 6,
+                        itemStyle: { color: 'rgba(255, 128, 0, 0.75)' }
+                    })),
+                    tooltip: {
+                        formatter: params => `${params.seriesName}<br/>Cluster: ${params.name}<br/>Expression: ${Number(params.value[1]).toFixed(3)}`
+                    }
+                }
+            ]
+        };
+        if (violinChart && !chartEl.querySelector('canvas')) {
+            violinChart.dispose();
+            violinChart = null;
+        }
+        if (!violinChart) {
+            violinChart = echarts.init(chartEl, null, { renderer: 'canvas' });
+        }
+        violinChart.setOption(option);
+        if (messageEl) {
+            const groupingLabels = {
+                cluster: 'Cluster',
+                celltype: 'Celltype',
+                stage: 'Stage',
+                cluster_celltype: 'Cluster + Celltype',
+                cluster_stage: 'Cluster + Stage'
+            };
+            messageEl.textContent = `${groupingLabels[expressionGrouping] || 'Cluster'} expression for ${selectedMarkerGene} (${geneExpressionRows.length} cells).`;
+        }
+    }
+
+    function renderMarkerTable(cluster) {
+        const tbody = document.getElementById('markerTableBody');
+        if (!tbody) {
+            return;
+        }
+        const allRows = cluster && markerGroups[cluster] ? markerGroups[cluster] : [];
+        const rows = allRows;
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4">No marker genes available for this cluster.</td></tr>';
+            return;
+        }
+        tbody.replaceChildren(...rows.map(row => {
+            const gene = row.gene || '-';
+            const tableRow = document.createElement('tr');
+            const geneCell = document.createElement('td');
+            const geneButton = document.createElement('button');
+            const pValCell = document.createElement('td');
+
+            geneButton.type = 'button';
+            geneButton.className = 'btn btn-link p-0 marker-gene-button';
+            geneButton.dataset.gene = gene;
+            geneButton.textContent = gene;
+            geneButton.addEventListener('click', () => selectMarkerGene(gene));
+            geneCell.appendChild(geneButton);
+
+            pValCell.className = 'text-end';
+            pValCell.textContent = row.p_val_adj || '-';
+            tableRow.append(geneCell, pValCell);
+            return tableRow;
+        }));
+    }
+
+    function fetchGeneAnnotation(gene) {
+        const params = new URLSearchParams({ gene_id: gene });
+        if (annotationTaxonomyId) {
+            params.set('taxonomy_id', annotationTaxonomyId);
+        } else if (annotationSpecies) {
+            params.set('species', annotationSpecies);
+        }
+        return fetch(`/api/gene_annotation/?${params.toString()}`)
+            .then(async response => {
+                if (!response.ok) {
+                    const errorJson = await response.json().catch(() => null);
+                    const message = errorJson && errorJson.error ? errorJson.error : response.statusText || 'Loading failed';
+                    throw new Error(message);
+                }
+                return response.json();
+            });
+    }
+
+    function renderAnnotationHtml(data) {
+        const sections = [];
+        const geneId = data.gene_id || 'Unknown';
+        const geneLink = annotationTaxonomyId
+            ? `/species/${encodeURIComponent(annotationTaxonomyId)}/gene/${encodeURIComponent(geneId)}/`
+            : `/gene/${encodeURIComponent(geneId)}/`;
+
+        sections.push(`<p><a href="${geneLink}" class="btn btn-sm btn-outline-primary mb-3" target="_blank" rel="noopener noreferrer">View gene detail for ${geneId}</a></p>`);
+
+        if (data.eggnog && data.eggnog.rows && data.eggnog.rows.length) {
+            sections.push('<h5>EggNOG annotation</h5>');
+            const header = data.eggnog.header || [];
+            if (header.length) {
+                sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.eggnog.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            } else {
+                sections.push('<pre>' + data.eggnog.rows.map(row => row.join('\t')).join('\n') + '</pre>');
+            }
+            if (data.eggnog.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.eggnog.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No EggNOG annotation found.</div>');
+        }
+
+        if (data.interpro && data.interpro.rows && data.interpro.rows.length) {
+            sections.push('<h5>InterProScan annotation</h5>');
+            const header = data.interpro.header || [];
+            sections.push('<div class="table-responsive"><table class="table table-sm table-bordered mb-3"><thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' + data.interpro.rows.map(row => `<tr>${row.map(cell => `<td>${cell || ''}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+            if (data.interpro.member_dbs && data.interpro.member_dbs.length) {
+                sections.push(`<div class="text-muted small mb-3">Member DBs: ${data.interpro.member_dbs.join(', ')}</div>`);
+            }
+            if (data.interpro.source) {
+                sections.push(`<div class="text-muted small mb-3">Source file: ${data.interpro.source}</div>`);
+            }
+        } else {
+            sections.push('<div class="alert alert-secondary">No InterProScan annotation found.</div>');
+        }
+
+        return sections.join('');
+    }
+
+    function populateMarkerClusterSelect(clusterNames) {
+        const select = document.getElementById('markerClusterSelect');
+        if (!select || !clusterNames.length) {
+            return;
+        }
+        select.innerHTML = clusterNames.map(name => `<option value="${name}">${name}</option>`).join('');
+        select.onchange = event => {
+            const cluster = event.target.value;
+            currentMarkerCluster = cluster;
+            selectedMarkerGene = null;
+            selectedMarkerGeneCluster = null;
+            setGeneAnnotation(null);
+            renderMarkerTable(cluster);
+            if (cluster && umapGroups[cluster]) {
+                currentHighlightedCluster = cluster;
+                updateUmapHighlight();
+            }
+        };
+        const firstCluster = clusterNames[0];
+        currentMarkerCluster = firstCluster;
+        renderMarkerTable(firstCluster);
+    }
+
+    function attachMarkerGeneButtons() {
+        const buttons = document.querySelectorAll('.marker-gene-button');
+        buttons.forEach(button => {
+            button.onclick = () => {
+                const gene = button.dataset.gene;
+                selectMarkerGene(gene);
+            };
+        });
+    }
+
+    function selectMarkerGene(gene) {
+        selectedMarkerGene = gene || null;
+        selectedMarkerGeneCluster = gene ? markerGeneClusterMap[gene] : null;
+        setGeneAnnotation(gene);
+        loadExpressionForGene(gene);
+    }
+
+    function getAvailableMarkerRows(cluster) {
+        const allRows = cluster && markerGroups[cluster] ? markerGroups[cluster] : [];
+        return allRows;
+    }
+
+    function loadMarkersFile() {
+        if (!markersFileUrl) {
+            return;
+        }
+        fetch(markersFileUrl)
+            .then(response => response.text())
+            .then(text => {
+                const rows = parseCsv(text).filter(r => r.length);
+                if (rows.length < 2) {
+                    throw new Error('Markers.csv file is empty or invalid.');
+                }
+                const header = rows[0].map(h => h.trim());
+                const clusterIndex = header.findIndex(h => /^Cluster$/i.test(h));
+                const geneIndex = header.findIndex(h => /Gene[_ ]?ID|Gene/i.test(h));
+                const pValAdjIndex = header.findIndex(h => /p_val_adj/i.test(h));
+                const pValIndex = header.findIndex(h => /p_val$/i.test(h));
+                const avgLog2FCIndex = header.findIndex(h => /avg_log2FC/i.test(h));
+                const pct1Index = header.findIndex(h => /^pct\.1$/i.test(h));
+                const pct2Index = header.findIndex(h => /^pct\.2$/i.test(h));
+                markerGroups = {};
+                markerGeneClusterMap = {};
+                rows.slice(1).forEach(row => {
+                    const cluster = clusterIndex >= 0 ? (row[clusterIndex] || 'Unknown').trim() : 'Unknown';
+                    const gene = geneIndex >= 0 ? (row[geneIndex] || '').trim() : '-';
+                    const pValAdj = pValAdjIndex >= 0 ? (row[pValAdjIndex] || '').trim() : '';
+                    const pVal = pValIndex >= 0 ? (row[pValIndex] || '').trim() : '';
+                    const avgLog2FC = avgLog2FCIndex >= 0 ? (row[avgLog2FCIndex] || '').trim() : '';
+                    const pct1 = pct1Index >= 0 ? (row[pct1Index] || '').trim() : '';
+                    const pct2 = pct2Index >= 0 ? (row[pct2Index] || '').trim() : '';
+                    if (!gene) {
+                        return;
+                    }
+                    markerGroups[cluster] = markerGroups[cluster] || [];
+                    markerGroups[cluster].push({
+                        gene,
+                        p_val_adj: pValAdj,
+                        p_val: pVal,
+                        avg_log2FC: avgLog2FC,
+                        'pct.1': pct1,
+                        'pct.2': pct2,
+                    });
+                    markerGeneClusterMap[gene] = cluster;
+                });
+                markerDataLoaded = true;
+                populateMarkerClusterSelect(Object.keys(markerGroups));
+                if (expressionLoaded && currentMarkerCluster) {
+                    renderMarkerTable(currentMarkerCluster);
+                }
+            })
+            .catch(error => {
+                const tbody = document.getElementById('markerTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Failed to load marker genes: ${error.message}</td></tr>`;
+                }
+            });
+    }
+
+    window.addEventListener('load', () => {
+        if (expressionGenerationQueued) {
+            const statusEl = document.getElementById('expressionStatus');
+            if (statusEl) {
+                statusEl.textContent = 'Gene expression files are being generated in the background.';
+            }
+        }
+        /* defer expression matrix loading until a gene is selected */
+        expressionLoad = null;
+        if (umapDataUrl) {
+            renderUmapChart();
+        }
+        if (markersFileUrl) {
+            loadMarkersFile();
+        }
+        if (expressionCsvUrl && !expressionFolderReady) {
+            ensureExpressionLoaded();
+        }
+        const expressionGroupingSelect = document.getElementById('expressionGroupingSelect');
+        if (expressionGroupingSelect) {
+            expressionGroupingSelect.addEventListener('change', event => {
+                expressionGrouping = event.target.value || 'cluster';
+                renderViolinChart();
+            });
+        }
+        setGeneAnnotation(null);
+
+        function collectSinglecellDownloadFiles() {
+            var selectedItems = [];
+            document.querySelectorAll('.singlecell-download-file-checkbox:checked').forEach(function(checkbox) {
+                var filePath = checkbox.dataset.filePath;
+                var fileLabel = checkbox.dataset.fileLabel;
+                if (filePath) {
+                    selectedItems.push({ id: filePath, label: fileLabel || filePath, path: filePath });
+                }
+            });
+            return selectedItems;
+        }
+
+        var selectAllCheckbox = document.getElementById('singlecellDownloadFilesSelectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                document.querySelectorAll('.singlecell-download-file-checkbox').forEach(function(checkbox) {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+            });
+        }
+
+        var downloadFilesBtn = document.getElementById('singlecellDownloadFilesBtn');
+        if (downloadFilesBtn) {
+            downloadFilesBtn.addEventListener('click', function() {
+                var selectedItems = collectSinglecellDownloadFiles();
+                if (!selectedItems.length) {
+                    alert('Please select at least one file to add to the download bar.');
+                    return;
+                }
+                downloadCartAddSelectedFiles('selected_files_singlecell_{{ dataset.id }}', '{{ dataset.species }} Files', selectedItems);
+            });
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

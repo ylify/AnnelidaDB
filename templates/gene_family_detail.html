@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}Gene Family Detail - AnnelidaDB{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h2 class="fw-bold">Gene Family Detail</h2>
+        <p class="lead text-white-50">Browse details for family {{ family.family_id }} from source {{ family.source }}.</p>
+    </div>
+</div>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="dashboard-section shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-0">{{ family.family_name }}</h4>
+                        <p class="mb-0 text-muted">Family ID: {{ family.family_id }} / Source: {{ family.source }}</p>
+                    </div>
+                    <a href="/gene-family/?source={{ selected_source }}" class="btn btn-outline-secondary">Back to Gene Family</a>
+                </div>
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="border rounded-3 p-3 h-100">
+                            <h6 class="text-uppercase text-muted">Family ID</h6>
+                            <p class="fs-5 fw-semibold mb-0">{{ family.family_id }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded-3 p-3 h-100">
+                            <h6 class="text-uppercase text-muted">Source</h6>
+                            <p class="fs-5 fw-semibold mb-0">{{ family.source }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded-3 p-3 h-100">
+                            <h6 class="text-uppercase text-muted">Members</h6>
+                            <p class="fs-5 fw-semibold mb-0">{{ family.member_count }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded-3 p-3 h-100">
+                            <h6 class="text-uppercase text-muted">Representative Gene</h6>
+                            <p class="fs-5 fw-semibold mb-0">{{ family.representative_gene }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <h5>Description</h5>
+                    <p>{{ family.description }}</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Species</th>
+                                <th>Taxonomy ID</th>
+                                <th>Member Count</th>
+                                <th>Genes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in family.members %}
+                            <tr>
+                                <td>{% if member.taxonomy_id %}<a href="{% url 'species_detail' member.taxonomy_id %}">{{ member.species }}</a>{% else %}{{ member.species }}{% endif %}</td>
+                                <td>{% if member.taxonomy_id %}<a href="{% url 'species_detail' member.taxonomy_id %}">{{ member.taxonomy_id }}</a>{% else %}<span class="text-muted">Unknown</span>{% endif %}</td>
+                                <td>{{ member.member_count }}</td>
+                                <td><code>{% for gene in member.genes %}{% if member.taxonomy_id %}<a href="{% url 'species_gene_detail' member.taxonomy_id gene %}">{{ gene }}</a>{% else %}<a href="{% url 'gene_detail' gene %}">{{ gene }}</a>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

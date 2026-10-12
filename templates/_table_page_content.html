@@ -1,0 +1,233 @@
+<div class="table-responsive">
+    <table id="omicsTable" class="table table-striped table-hover align-middle w-100">
+        <thead class="table-dark">
+            <tr>
+                <th class="text-center selection-column" style="width: 1%;"><input type="checkbox" id="selectAllRows" title="Toggle select all"></th>
+                {% if data_type == 'taxonomy' %}
+                    <th class="taxonomy-source-ncbi">Class</th><th class="taxonomy-source-ncbi">Order</th><th class="taxonomy-source-ncbi">Family</th><th class="taxonomy-source-updated">Updated Clade 6</th><th class="taxonomy-source-updated">Updated Clade 5</th><th class="taxonomy-source-updated">Updated Clade 4</th><th class="taxonomy-source-updated">Updated Clade 3</th><th class="taxonomy-source-updated">Updated Clade 2</th><th class="taxonomy-source-updated">Updated Clade 1</th><th class="text-nowrap">Species</th><th>NCBI ID</th><th class="text-center" title="Whole Genome Assembly">Genome</th><th class="text-center" title="Mitochondrial Genome">Mito</th><th class="text-center" title="SRA DNA runs">SRA (DNA)</th><th class="text-center" title="SRA RNA runs">SRA (RNA)</th><th class="text-center" title="Epigenome study count">Epigenome</th><th class="text-center" title="Proteome resource count">Proteome</th><th class="text-center" title="Single-cell study count">Single-cell</th><th class="text-center" title="Symbiont datasets">Symbiont</th>
+                {% elif data_type == 'genome' %}
+                    <th class="taxonomy-source-ncbi">Class</th><th class="taxonomy-source-ncbi">Order</th><th class="taxonomy-source-ncbi">Family</th><th class="taxonomy-source-updated">Updated Clade 6</th><th class="taxonomy-source-updated">Updated Clade 5</th><th class="taxonomy-source-updated">Updated Clade 4</th><th class="taxonomy-source-updated">Updated Clade 3</th><th class="taxonomy-source-updated">Updated Clade 2</th><th class="taxonomy-source-updated">Updated Clade 1</th><th>Species</th><th>Assembly level</th><th>Size (Mb)</th><th>GC (%)</th><th>Scaffold N50 (bp)</th><th class="busco-source-metazoa">Genome Completeness (%)<small class="d-block text-white-50 fw-normal">metazoa_odb12 (n=672)</small></th><th class="busco-source-lopho">Genome Completeness (%)<small class="d-block text-white-50 fw-normal">lophotrochozoa_odb12.2 (n=1329)</small></th><th>Gene Number</th><th class="busco-source-metazoa">Gene Completeness (%)<small class="d-block text-white-50 fw-normal">metazoa_odb12 (n=672)</small></th><th class="busco-source-lopho">Gene Completeness (%)<small class="d-block text-white-50 fw-normal">lophotrochozoa_odb12.2 (n=1329)</small></th><th>Gene number (ANNEVO)</th><th class="busco-source-metazoa">Gene Completeness (ANNEVO, %)<small class="d-block text-white-50 fw-normal">metazoa_odb12 (n=672)</small></th><th class="busco-source-lopho">Gene Completeness (ANNEVO, %)<small class="d-block text-white-50 fw-normal">lophotrochozoa_odb12.2 (n=1329)</small></th>
+                {% elif data_type == 'mitogenome' %}
+                    <th class="taxonomy-source-ncbi">Class</th><th class="taxonomy-source-ncbi">Order</th><th class="taxonomy-source-ncbi">Family</th><th class="taxonomy-source-updated">Updated Clade 6</th><th class="taxonomy-source-updated">Updated Clade 5</th><th class="taxonomy-source-updated">Updated Clade 4</th><th class="taxonomy-source-updated">Updated Clade 3</th><th class="taxonomy-source-updated">Updated Clade 2</th><th class="taxonomy-source-updated">Updated Clade 1</th><th>Species</th><th>Length (bp)</th><th>Topology</th><th>Genbank</th><th>RefSeq</th>
+                {% elif data_type == 'proteome' %}
+                    <th class="taxonomy-source-ncbi">Class</th><th class="taxonomy-source-ncbi">Order</th><th class="taxonomy-source-ncbi">Family</th><th class="taxonomy-source-updated">Updated Clade 6</th><th class="taxonomy-source-updated">Updated Clade 5</th><th class="taxonomy-source-updated">Updated Clade 4</th><th class="taxonomy-source-updated">Updated Clade 3</th><th class="taxonomy-source-updated">Updated Clade 2</th><th class="taxonomy-source-updated">Updated Clade 1</th><th>Species</th><th>Modality</th><th>Tissue</th><th>Stage</th><th>Publication</th>
+                {% elif data_type == 'epigenome' %}
+                    <th class="taxonomy-source-ncbi">Class</th><th class="taxonomy-source-ncbi">Order</th><th class="taxonomy-source-ncbi">Family</th><th class="taxonomy-source-updated">Updated Clade 6</th><th class="taxonomy-source-updated">Updated Clade 5</th><th class="taxonomy-source-updated">Updated Clade 4</th><th class="taxonomy-source-updated">Updated Clade 3</th><th class="taxonomy-source-updated">Updated Clade 2</th><th class="taxonomy-source-updated">Updated Clade 1</th><th>Species</th><th>Modality</th><th>Tissue</th><th>Stage</th><th>Publication</th>
+                {% elif data_type == 'symbiont' %}
+                    <th>Class</th><th>Order</th><th>Family</th><th>Host Species</th><th>Symbiont Type</th><th>Genome Size</th><th>GC %</th><th>Contigs</th><th>Completeness (%)</th><th>Contamination (%)</th><th>Symbiont Taxonomy</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td class="text-center selection-checkbox-cell"><input type="checkbox" class="download-row-checkbox" value="{% if data_type == 'symbiont' %}{{ row.host_taxonomy_id|default:row.host_species }}{% elif data_type == 'taxonomy' %}{{ row.ncbi_taxonomy_id|default:row.species }}{% elif row.taxonomy %}{{ row.taxonomy.ncbi_taxonomy_id|default:row.taxonomy.species }}{% else %}{{ row.ncbi_taxonomy_id|default:row.species|default:'' }}{% endif %}"></td>
+                {% if data_type == 'taxonomy' %}
+                    <td class="taxonomy-source-ncbi">{{ row.class_name|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.order|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.family|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade6|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade5|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade4|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade3|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade2|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade1|default:'-' }}</td>
+                    <td class="text-nowrap" data-download-label><a href="/species/{{ row.ncbi_taxonomy_id|default:row.species }}/" class="text-decoration-none fw-bold"><i>{{ row.species }}</i></a></td>
+                    <td class="text-nowrap"><a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id={{ row.ncbi_taxonomy_id }}" target="_blank" class="fw-bold badge bg-dark text-decoration-none">{{ row.ncbi_taxonomy_id }}</a></td>
+                    <td class="text-center">{% if row.has_genome %}<i class="fas fa-check-circle text-success fs-5" title="Available"></i>{% else %}<i class="fas fa-times text-black-50" title="Not Available"></i>{% endif %}</td>
+                    <td class="text-center">{% if row.has_mitogenome %}<i class="fas fa-check-circle text-success fs-5" title="Available"></i>{% else %}<i class="fas fa-times text-black-50" title="Not Available"></i>{% endif %}</td>
+                    <td class="text-center">
+                        {% if row.has_dna %}
+                            <a href="{{ row.dna_link }}" target="_blank" class="text-decoration-none">
+                                <span class="badge bg-primary">{{ row.dna_count|default:0 }}</span>
+                            </a>
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.has_rna %}
+                            <a href="{{ row.rna_link }}" target="_blank" class="text-decoration-none">
+                                <span class="badge bg-success">{{ row.rna_count|default:0 }}</span>
+                            </a>
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.epigenome_study_count|default:0 > 0 %}
+                            <a href="/species/{{ row.ncbi_taxonomy_id }}/" class="text-decoration-none">
+                                <span class="badge bg-purple text-white">{{ row.epigenome_study_count }}</span>
+                            </a>
+                        {% elif row.has_epigenome %}
+                            {% if row.epigenome_link %}
+                                <a href="{{ row.epigenome_link }}" target="_blank" class="text-decoration-none">
+                                    <span class="badge bg-purple text-white">1</span>
+                                </a>
+                            {% else %}
+                                <span class="badge bg-purple text-white">1</span>
+                            {% endif %}
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.proteome_study_count|default:0 > 0 %}
+                            <a href="/species/{{ row.ncbi_taxonomy_id }}/" class="text-decoration-none">
+                                <span class="badge bg-secondary">{{ row.proteome_study_count }}</span>
+                            </a>
+                        {% elif row.has_proteome %}
+                            {% if row.proteome_link %}
+                                <a href="{{ row.proteome_link }}" target="_blank" class="text-decoration-none">
+                                    <span class="badge bg-secondary">1</span>
+                                </a>
+                            {% else %}
+                                <span class="badge bg-secondary">1</span>
+                            {% endif %}
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.singlecell_count|default:0 > 0 %}
+                            <a href="/species/{{ row.ncbi_taxonomy_id }}/" class="text-decoration-none">
+                                <span class="badge bg-info text-dark">{{ row.singlecell_count }}</span>
+                            </a>
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.symbiont_count|default:0 > 0 %}
+                            <span class="badge bg-success">{{ row.symbiont_count }}</span>
+                        {% else %}
+                            <i class="fas fa-times text-black-50"></i>
+                        {% endif %}
+                    </td>
+                {% elif data_type == 'genome' %}
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.class_name|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.order|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.family|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade6|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade5|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade4|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade3|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade2|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade1|default:'-' }}</td>
+                    <td data-download-label><a href="{% url 'genome_detail' row.taxonomy.ncbi_taxonomy_id|default:row.taxonomy.species %}" class="text-decoration-none fw-bold"><i>{{ row.taxonomy.species }}</i></a></td>
+                    <td>{{ row.assembly_level|default:'-' }}</td>
+                    <td><span class="badge bg-success">{{ row.size_mb|default:'-' }}</span></td>
+                    <td>{{ row.gc_content|default:'-' }}</td>
+                    <td>{{ row.scaffold_n50|default:'-' }}</td>
+                    <td class="busco-source-metazoa" title="{{ row.completeness_genome_raw|default:'' }}">{{ row.completeness_genome_sd|default:'-' }}</td>
+                    <td class="busco-source-lopho" title="{{ row.completeness_genome_lopho_raw|default:'' }}">{{ row.completeness_genome_lopho_sd|default:'-' }}</td>
+                    <td>{{ row.gene_number|default:'-' }}</td>
+                    <td class="busco-source-metazoa" title="{{ row.completeness_gene|default:'' }}">{{ row.completeness_gene_sd|default:'-' }}</td>
+                    <td class="busco-source-lopho" title="{{ row.completeness_gene_lopho|default:'' }}">{{ row.completeness_gene_lopho_sd|default:'-' }}</td>
+                    <td>{{ row.gene_number_annevo|default:'-' }}</td>
+                    <td class="busco-source-metazoa" title="{{ row.completeness_gene_annevo|default:'' }}">{{ row.completeness_gene_annevo_sd|default:'-' }}</td>
+                    <td class="busco-source-lopho" title="{{ row.completeness_gene_annevo_lopho|default:'' }}">{{ row.completeness_gene_annevo_lopho_sd|default:'-' }}</td>
+                {% elif data_type == 'mitogenome' %}
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.class_name|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.order|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.taxonomy.family|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade6|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade5|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade4|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade3|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade2|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.taxonomy.updated_clade1|default:'-' }}</td>
+                    <td data-download-label><a href="{% url 'mitogenome_detail' row.taxonomy.ncbi_taxonomy_id|default:row.taxonomy.species %}" class="text-decoration-none fw-bold"><i>{{ row.taxonomy.species }}</i></a></td>
+                    <td><span class="badge bg-warning text-dark">{{ row.length_bp|default:'-' }}</span></td>
+                    <td>{{ row.topology|default:'-' }}</td>
+                    <td>{{ row.genbank|default:'-' }}</td>
+                    <td>{{ row.refseq|default:'-' }}</td>
+                {% elif data_type == 'proteome' %}
+                    <td class="taxonomy-source-ncbi">{{ row.class_name|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.order|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.family|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade6|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade5|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade4|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade3|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade2|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade1|default:'-' }}</td>
+                    <td data-download-label>
+                        {% if row.species_url %}
+                            <a href="{{ row.species_url }}" class="text-decoration-none fw-bold"><i>{{ row.species }}</i></a>
+                        {% else %}
+                            {{ row.species|default:'-' }}
+                        {% endif %}
+                    </td>
+                    <td>{{ row.modality|default:'-' }}</td>
+                    <td>{{ row.tissue|default:'-' }}</td>
+                    <td>{{ row.stage|default:'-' }}</td>
+                    <td class="text-center">
+                        {% if row.paper_id %}
+                            <a href="{% url 'proteome_detail_page' row.paper_id %}" class="text-decoration-none"><i class="fas fa-external-link-alt text-primary fs-5" title="Publication detail"></i></a>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                {% elif data_type == 'epigenome' %}
+                    <td class="taxonomy-source-ncbi">{{ row.class_name|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.order|default:'-' }}</td>
+                    <td class="taxonomy-source-ncbi">{{ row.family|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade6|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade5|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade4|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade3|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade2|default:'-' }}</td>
+                    <td class="taxonomy-source-updated">{{ row.updated_clade1|default:'-' }}</td>
+                    <td data-download-label>
+                        {% if row.species_url %}
+                            <a href="{{ row.species_url }}" class="text-decoration-none fw-bold"><i>{{ row.species }}</i></a>
+                        {% else %}
+                            {{ row.species|default:'-' }}
+                        {% endif %}
+                    </td>
+                    <td>{{ row.modality|default:'-' }}</td>
+                    <td>{{ row.tissue|default:'-' }}</td>
+                    <td>{{ row.stage|default:'-' }}</td>
+                    <td class="text-center">
+                        {% if row.paper_id %}
+                            <a href="{% url 'epigenome_detail_page' row.paper_id %}" class="text-decoration-none"><i class="fas fa-external-link-alt text-primary fs-5" title="Publication detail"></i></a>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                {% elif data_type == 'symbiont' %}
+                    <td>{{ row.host_class_name|default:'-' }}</td>
+                    <td>{{ row.host_order|default:'-' }}</td>
+                    <td>{{ row.host_family|default:'-' }}</td>
+                    <td class="fw-bold">
+                        {% if row.host_taxonomy_id %}
+                            <a href="{% url 'symbiont_detail' row.host_taxonomy_id %}?sub={{ row.sub|urlencode }}" class="text-decoration-none text-primary fw-bold"><i>{{ row.host_species }}</i></a>
+                        {% else %}
+                            <span class="text-muted">{{ row.host_species }}</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-info text-dark">{{ row.symbiont_type|default:'-' }}</span></td>
+                    <td>{{ row.size_bp|default:'-' }}</td>
+                    <td>{{ row.gc_content|default:'-' }}</td>
+                    <td>{% if row.contigs == 1 %}<span class="badge bg-success">{{ row.contigs }}</span>{% elif row.contigs is not none %}<span class="badge bg-warning text-dark">{{ row.contigs }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if row.completeness is not none %}{% if row.completeness >= 90 %}<span class="badge bg-success">{{ row.completeness }}</span>{% else %}<span class="badge bg-warning text-dark">{{ row.completeness }}</span>{% endif %}{% else %}-{% endif %}</td>
+                    <td>{% if row.contamination is not none %}{% if row.contamination <= 10 %}<span class="badge bg-success">{{ row.contamination }}</span>{% else %}<span class="badge bg-warning text-dark">{{ row.contamination }}</span>{% endif %}{% else %}-{% endif %}</td>
+                    <td style="max-width: 250px;"><small class="text-muted"><b>{{ row.phylum|default:'-' }}</b> > {{ row.class_name|default:'-' }} > <i>{{ row.species|default:'Unknown' }}</i></small></td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not data %}
+    <div class="text-center text-muted py-4">
+        <i class="fas fa-inbox fa-3x mb-3 text-light"></i><br>
+        No records found in the database, or this module is still under construction.
+    </div>
+    {% endif %}
+</div>
+<form id="downloadSelectionForm" method="post" action="/download/" class="d-none">
+    {% csrf_token %}
+    <input type="hidden" name="data_type" value="{{ data_type }}">
+    <div id="downloadSelectionInputs"></div>
+</form>

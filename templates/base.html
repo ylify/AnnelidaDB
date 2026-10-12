@@ -1,0 +1,986 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AnnelidaDB{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f4f6f9; }
+        .navbar { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important; padding: 10px 0; }
+        .navbar .container-fluid { min-width: 0; padding-left: 0.75rem; padding-right: 0.75rem; }
+        .navbar-collapse { overflow-x: hidden; min-width: 0; }
+        .navbar-nav { flex-wrap: nowrap; min-width: 0; margin-left: auto; }
+        .navbar-nav .nav-item { flex: 0 1 auto; margin-bottom: 0; }
+        .nav-link { font-weight: 500; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.26px; white-space: nowrap; padding-left: 0.25rem; padding-right: 0.25rem; }
+        @media (max-width: 1200px) {
+            .nav-link { padding-left: 0.25rem; padding-right: 0.25rem; font-size: 0.78rem; letter-spacing: 0.25px; }
+        }
+        @media (max-width: 992px) {
+            .nav-link { padding-left: 0.18rem; padding-right: 0.18rem; font-size: 0.72rem; letter-spacing: 0.2px; }
+        }
+        .dashboard-section { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .page-summary-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            min-height: 0;
+        }
+        .page-summary-row {
+            align-items: stretch;
+        }
+        .page-summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+        }
+        .navbar-brand img {
+            height: 36px;
+            width: auto;
+            margin-right: 0.75rem;
+        }
+        .page-summary-card h6 {
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+        }
+        .page-summary-card p.display-6 {
+            font-size: 2.4rem;
+            line-height: 1;
+        }
+        .hero-section { background: linear-gradient(135deg, #203a43, #2c5364); color: white; padding: 30px 0; }
+        .section-title { margin-top: 2.5rem; margin-bottom: 1.5rem; }
+        .quick-btn { transition: all 0.3s ease; border-width: 2px; }
+        .quick-btn:hover { transform: translateX(10px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card-header { background-color: #ffffff; }
+        .navbar .dropdown-toggle::after { transition: transform .2s ease; }
+        .dropdown-menu {
+            position: absolute;
+            overflow: visible;
+            max-height: none;
+        }
+        .navbar,
+        .navbar-collapse,
+        .dropdown {
+            overflow: visible;
+        }
+        #downloadCartToggleButton {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 1060;
+            min-width: 260px;
+            max-width: 320px;
+        }
+        #downloadCartDrawer {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            top: 0;
+            width: 460px;
+            max-width: min(100%, 460px);
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            background: #ffffff;
+            box-shadow: -12px 0 30px rgba(0, 0, 0, 0.15);
+            z-index: 1070;
+            display: flex;
+            flex-direction: column;
+        }
+        #downloadCartDrawer.open {
+            transform: translateX(0);
+        }
+        #downloadCartDrawer .download-cart-header,
+        #downloadCartDrawer .download-cart-footer {
+            padding: 1rem 1.25rem;
+        }
+        #downloadCartDrawer .download-cart-header {
+            border-bottom: 1px solid #e9ecef;
+        }
+        #downloadCartDrawer .download-cart-footer {
+            border-top: 1px solid #e9ecef;
+            border-bottom: none;
+        }
+        #downloadCartDrawer .download-cart-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        #downloadCartDrawer .download-cart-body {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            padding: 1rem 1.25rem;
+        }
+        #downloadCartDrawer .download-cart-item {
+            border: 1px solid #e9ecef;
+            border-radius: 0.85rem;
+            background: #f8f9fa;
+            padding: 1rem;
+            margin-bottom: 0.85rem;
+        }
+        #downloadCartDrawer .download-cart-item strong {
+            display: block;
+            margin-bottom: 0.35rem;
+        }
+        #downloadCartDrawer .download-cart-meta {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        #downloadCartDrawer .download-cart-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            overflow-x: hidden;
+            padding-bottom: 0;
+            margin-top: 0.65rem;
+        }
+        #downloadCartDrawer .download-cart-badges::-webkit-scrollbar {
+            width: 6px;
+        }
+        #downloadCartDrawer .download-cart-badges::-webkit-scrollbar-thumb {
+            background: rgba(108, 117, 125, 0.5);
+            border-radius: 999px;
+        }
+        .download-cart-item-badge {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            width: 100%;
+            padding: 0.4rem 0.65rem;
+            border-radius: 0.65rem;
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            color: #212529;
+            font-size: 0.88rem;
+            gap: 0.25rem;
+        }
+        .download-cart-item-badge span {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-x: auto;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+        .download-cart-item-badge button {
+            flex: 0 0 auto;
+            border: none;
+            background: transparent;
+            padding: 0 0.2rem;
+            margin-left: 0.25rem;
+            min-width: auto;
+            height: auto;
+            line-height: 1;
+            color: #6c757d;
+            opacity: 0.85;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .download-cart-item-badge button:hover {
+            color: #dc3545;
+            opacity: 1;
+        }
+        .badge.bg-purple {
+            background-color: #6f42c1 !important;
+            color: #ffffff !important;
+        }
+        .badge.bg-purple.text-white {
+            color: #ffffff !important;
+        }
+        #downloadCartDrawer .download-cart-footer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        #downloadCartDrawer .download-cart-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        #downloadCartDrawer .download-cart-actions button {
+            min-width: 120px;
+        }
+        #downloadCartBadge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.75rem;
+            min-height: 1.75rem;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #0d6efd;
+            font-weight: 700;
+            margin-left: 0.5rem;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-xl navbar-dark">
+        <div class="container-fluid px-5">
+            <a class="navbar-brand fw-bold fs-4 d-flex align-items-center" href="/">
+                <img src="{% static 'logo.svg' %}" alt="AnnelidaDB logo">
+                <span>AnnelidaDB</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link {% if data_type == 'taxonomy' %}active text-info{% endif %}" href="/taxonomy/">Taxonomy</a></li>
+                    <li class="nav-item"><a class="nav-link {% if data_type == 'genome' or active_page == 'genome' %}active text-info{% endif %}" href="/genome/">Genome</a></li>
+                    <li class="nav-item"><a class="nav-link {% if active_page == 'proteome' %}active text-info{% endif %}" href="/proteome/">Proteome</a></li>
+                    <li class="nav-item"><a class="nav-link {% if active_page == 'epigenome' %}active text-info{% endif %}" href="/epigenome/">Epigenome</a></li>
+                    <li class="nav-item"><a class="nav-link {% if data_type == 'mitogenome' or active_page == 'mitochondria' %}active text-info{% endif %}" href="/mitochondria/">Mitochondria</a></li>
+                    <li class="nav-item"><a class="nav-link {% if active_page == 'transcriptome' %}active text-info{% endif %}" href="/transcriptome/">Transcriptome</a></li>
+                    <li class="nav-item"><a class="nav-link {% if active_page == 'singlecell' %}active text-info{% endif %}" href="/singlecell/">Single-cell</a></li>
+                    <li class="nav-item"><a class="nav-link {% if active_page == 'synteny' %}active text-info{% endif %}" href="/synteny/">Synteny</a></li>
+                    <li class="nav-item"><a class="nav-link {% if data_type == 'symbiont' or active_page == 'symbiont' %}active text-info{% endif %}" href="/symbiont/">Symbiont</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if active_page == 'tools' %}active text-info{% endif %}" href="/tools/" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Tools
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="toolsDropdown">
+                            <li><a class="dropdown-item" href="/blast/">BLAST</a></li>
+                        <li><a class="dropdown-item" href="/gene-search/">Gene Search</a></li>
+                        <li><a class="dropdown-item" href="/gene-family/">Gene Family</a></li>
+                        <li><a class="dropdown-item" href="/synteny-upload/">Synteny Upload</a></li>
+                        <li><a class="dropdown-item" href="/jbrowse/">Genome Browser</a></li>
+                        <li><a class="dropdown-item" href="/download/">Download</a></li>
+                        <li><a class="dropdown-item" href="/submit/">Submit</a></li>
+                        <li><a class="dropdown-item" href="{% url 'user_guide' %}">User Guide</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div id="csrfTokenContainer" style="display:none;">{% csrf_token %}</div>
+    <div id="downloadCartDrawer" aria-hidden="true">
+        <div class="download-cart-header d-flex align-items-start justify-content-between gap-3">
+            <div>
+                <h5 class="mb-1"><i class="fas fa-shopping-cart text-info me-2"></i>Download Bar</h5>
+                <p class="mb-0 text-muted small">Collect download choices and fetch them later in one place.</p>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadCartClose()" aria-label="Close drawer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="download-cart-body">
+            <div id="downloadCartStatus" class="p-3 bg-light border rounded mb-3 d-none">
+                <div id="downloadCartStatusMessage" class="small text-muted">Preparing download...</div>
+                <div class="progress mt-2" style="height: 8px;">
+                    <div id="downloadCartProgress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
+                </div>
+            </div>
+            <div id="downloadCartItems"></div>
+            <div id="downloadCartEmpty" class="text-center text-muted py-5">Your download bar is empty. Select rows and add them here.</div>
+        </div>
+        <div class="download-cart-footer">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="downloadCartClear()">Clear All</button>
+            <div class="download-cart-actions">
+                <button type="button" class="btn btn-primary btn-sm" onclick="downloadCartDownloadAll()"><i class="fas fa-download me-1"></i> Download All</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="downloadCartClose()"><i class="fas fa-times me-1"></i> Close</button>
+            </div>
+        </div>
+    </div>
+    <button id="downloadCartToggleButton" class="btn btn-info shadow-lg" type="button" onclick="downloadCartOpen()">
+        <i class="fas fa-shopping-cart me-2"></i>
+        Download Bar <span id="downloadCartBadge">0</span>
+    </button>
+    {% block content %}{% endblock %}
+    <footer class="bg-dark py-4 text-white-50 mt-auto">
+        <div class="container text-center">
+            <p class="mb-1">&copy; 2026 AnnelidaDB Database. All rights reserved.</p>
+            <p class="mb-0">AnnelidaDB is maintained by Prof. Jian-Wen Qiu's Lab at Hong Kong Baptist University. <a href="/about/" class="text-white-50 text-decoration-underline">About</a></p>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.downloadCartStorageKey = 'AnnelidaDBDownloadCart';
+        window.downloadCartLabels = {
+            genome: 'Genome',
+            mitogenome: 'Mitogenome',
+            proteome: 'Proteome',
+            epigenome: 'Epigenome',
+            singlecell: 'Single-cell',
+            symbiont: 'Symbiont',
+            taxonomy: 'Taxonomy',
+            transcriptome: 'Transcriptome'
+        };
+
+        function downloadCartGet() {
+            try {
+                var stored = localStorage.getItem(window.downloadCartStorageKey);
+                return stored ? JSON.parse(stored) : {};
+            } catch (err) {
+                return {};
+            }
+        }
+
+        function downloadCartSave(cart) {
+            localStorage.setItem(window.downloadCartStorageKey, JSON.stringify(cart));
+            downloadCartRender();
+        }
+
+        function downloadCartRemoveItem(groupKey, itemId) {
+            var cart = downloadCartGet();
+            if (!cart[groupKey] || !cart[groupKey].items) {
+                return;
+            }
+            delete cart[groupKey].items[itemId];
+            if (!Object.keys(cart[groupKey].items).length) {
+                delete cart[groupKey];
+            }
+            downloadCartSave(cart);
+        }
+
+        function downloadCartClear() {
+            localStorage.removeItem(window.downloadCartStorageKey);
+            downloadCartRender();
+        }
+
+        function downloadCartCount() {
+            var cart = downloadCartGet();
+            return Object.values(cart).reduce(function(total, group) {
+                return total + Object.keys(group.items || {}).length;
+            }, 0);
+        }
+
+        function downloadCartRender() {
+            var cart = downloadCartGet();
+            var itemsContainer = document.getElementById('downloadCartItems');
+            var emptyMessage = document.getElementById('downloadCartEmpty');
+            var badge = document.getElementById('downloadCartBadge');
+            var totalCount = downloadCartCount();
+            badge.textContent = totalCount;
+
+            function shortLabel(label) {
+                if (!label) return '';
+                var value = String(label);
+                if (value.indexOf('/') !== -1 || value.indexOf('\\') !== -1) {
+                    value = value.replace(/.*[\\/]/, '');
+                }
+                return value;
+            }
+
+            itemsContainer.innerHTML = '';
+            if (!totalCount) {
+                emptyMessage.style.display = 'block';
+                return;
+            }
+            emptyMessage.style.display = 'none';
+
+            Object.keys(cart).forEach(function(groupKey) {
+                var group = cart[groupKey];
+                var itemIds = Object.keys(group.items || {});
+                if (!itemIds.length) {
+                    return;
+                }
+
+                itemIds.sort(function(a, b) {
+                    var itemA = group.items[a] || {};
+                    var itemB = group.items[b] || {};
+                    var labelA = String(itemA.label || a).toLowerCase();
+                    var labelB = String(itemB.label || b).toLowerCase();
+                    if (labelA < labelB) return -1;
+                    if (labelA > labelB) return 1;
+                    return 0;
+                });
+
+                var badgesContainer = document.createElement('div');
+                badgesContainer.className = 'download-cart-meta download-cart-badges';
+
+                var visibleCount = Math.min(20, itemIds.length);
+                itemIds.slice(0, visibleCount).forEach(function(itemId) {
+                    var item = group.items[itemId] || {};
+                    var label = shortLabel(item.label || itemId);
+                    var badge = document.createElement('div');
+                    badge.className = 'download-cart-item-badge';
+
+                    var labelSpan = document.createElement('span');
+                    labelSpan.textContent = label;
+                    var titleText = item.path || item.label || itemId;
+                    if (titleText) {
+                        badge.setAttribute('title', titleText);
+                    }
+
+                    var removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'btn btn-sm btn-outline-danger me-2';
+                    removeButton.textContent = '×';
+                    removeButton.setAttribute('aria-label', 'Remove item');
+                    removeButton.addEventListener('click', function() {
+                        downloadCartRemoveItem(groupKey, itemId);
+                    });
+
+                    badge.appendChild(removeButton);
+                    badge.appendChild(labelSpan);
+                    badgesContainer.appendChild(badge);
+                });
+
+                if (itemIds.length > 20) {
+                    var extraContainer = document.createElement('div');
+                    extraContainer.className = 'download-cart-extra-items';
+                    extraContainer.style.display = 'none';
+                    extraContainer.style.flexDirection = 'column';
+                    extraContainer.style.gap = '0.35rem';
+                    itemIds.slice(20).forEach(function(itemId) {
+                        var item = group.items[itemId] || {};
+                        var label = shortLabel(item.label || itemId);
+                        var badge = document.createElement('div');
+                        badge.className = 'download-cart-item-badge';
+
+                        var labelSpan = document.createElement('span');
+                        labelSpan.textContent = label;
+
+                        var removeButton = document.createElement('button');
+                        removeButton.type = 'button';
+                        removeButton.className = 'btn btn-sm btn-outline-danger me-2';
+                        removeButton.textContent = '×';
+                        removeButton.setAttribute('aria-label', 'Remove item');
+                        removeButton.addEventListener('click', function() {
+                            downloadCartRemoveItem(groupKey, itemId);
+                        });
+
+                        badge.appendChild(removeButton);
+                        badge.appendChild(labelSpan);
+                        extraContainer.appendChild(badge);
+                    });
+
+                    var moreBadge = document.createElement('button');
+                    moreBadge.type = 'button';
+                    moreBadge.className = 'download-cart-item-badge bg-secondary text-white';
+                    moreBadge.textContent = '+' + (itemIds.length - 20) + ' more';
+                    moreBadge.style.cursor = 'pointer';
+                    moreBadge.addEventListener('click', function() {
+                        extraContainer.style.display = 'flex';
+                        moreBadge.style.display = 'none';
+                    });
+                    badgesContainer.appendChild(moreBadge);
+                    badgesContainer.appendChild(extraContainer);
+                }
+
+                var itemNode = document.createElement('div');
+                itemNode.className = 'download-cart-item';
+
+                var headerRow = document.createElement('div');
+                headerRow.className = 'd-flex justify-content-between align-items-start mb-2';
+
+                var titleColumn = document.createElement('div');
+                var title = document.createElement('strong');
+                title.textContent = group.label || window.downloadCartLabels[groupKey] || groupKey;
+                var titleMeta = document.createElement('div');
+                titleMeta.className = 'download-cart-meta';
+                titleMeta.textContent = itemIds.length + ' item(s)';
+                titleColumn.appendChild(title);
+                titleColumn.appendChild(titleMeta);
+
+                var actionColumn = document.createElement('div');
+                actionColumn.className = 'd-flex gap-2';
+
+                var downloadButton = document.createElement('button');
+                downloadButton.type = 'button';
+                downloadButton.className = 'btn btn-sm btn-outline-primary';
+                downloadButton.textContent = 'Download';
+                downloadButton.addEventListener('click', function() {
+                    downloadCartDownloadGroup(groupKey);
+                });
+
+                var removeGroupButton = document.createElement('button');
+                removeGroupButton.type = 'button';
+                removeGroupButton.className = 'btn btn-sm btn-outline-danger';
+                removeGroupButton.textContent = 'Remove';
+                removeGroupButton.addEventListener('click', function() {
+                    downloadCartRemoveGroup(groupKey);
+                });
+
+                actionColumn.appendChild(downloadButton);
+                actionColumn.appendChild(removeGroupButton);
+
+                headerRow.appendChild(titleColumn);
+                headerRow.appendChild(actionColumn);
+                itemNode.appendChild(headerRow);
+                itemNode.appendChild(badgesContainer);
+                itemsContainer.appendChild(itemNode);
+            });
+        }
+
+        function downloadCartOpen() {
+            document.getElementById('downloadCartDrawer').classList.add('open');
+            document.getElementById('downloadCartDrawer').setAttribute('aria-hidden', 'false');
+            downloadCartRender();
+        }
+
+        function downloadCartClose() {
+            document.getElementById('downloadCartDrawer').classList.remove('open');
+            document.getElementById('downloadCartDrawer').setAttribute('aria-hidden', 'true');
+        }
+
+        function getCsrfToken() {
+            var tokenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            return tokenInput ? tokenInput.value : '';
+        }
+
+        function collectSelectedItems(dataGroup, labelColumn) {
+            var nodes = document.querySelectorAll('.download-checkbox[data-group="' + dataGroup + '"]:checked');
+            if (!nodes.length) {
+                nodes = document.querySelectorAll('.download-row-checkbox:checked');
+            }
+            return Array.from(nodes).map(function(node) {
+                var itemId = node.value;
+                var sub = dataGroup === 'symbiont' ? (node.dataset.sub || 'symbiont') : '';
+                var row = node.closest('tr');
+                var label = itemId;
+                var preferredLabel = row ? row.querySelector('[data-download-label]') : null;
+                if (preferredLabel) {
+                    label = preferredLabel.textContent.trim() || itemId;
+                } else if (row && row.children[labelColumn]) {
+                    label = row.children[labelColumn].textContent.trim() || itemId;
+                }
+                return { id: dataGroup === 'symbiont' ? itemId + '::' + sub : itemId, label: label };
+            });
+        }
+
+        function initTaxonomyDisplayToggle(tableSelector, dataTableInstance) {
+            var ncbiToggle = document.getElementById('toggleNcbiTaxonomy');
+            var updatedToggle = document.getElementById('toggleUpdatedRelationship');
+            if (!ncbiToggle || !updatedToggle || !window.jQuery || !dataTableInstance) {
+                return;
+            }
+
+            var storageKey = 'annelidadb.taxonomyDisplayPreferences';
+            var $table = window.jQuery(tableSelector);
+            if (!$table.length) {
+                return;
+            }
+
+            var ncbiColumns = [];
+            var updatedColumns = [];
+            $table.find('thead th').each(function(index) {
+                if (this.classList.contains('taxonomy-source-ncbi')) {
+                    ncbiColumns.push(index);
+                }
+                if (this.classList.contains('taxonomy-source-updated')) {
+                    updatedColumns.push(index);
+                }
+            });
+
+            if (!ncbiColumns.length || !updatedColumns.length) {
+                return;
+            }
+
+            function loadPreferences() {
+                try {
+                    var raw = localStorage.getItem(storageKey);
+                    if (!raw) {
+                        return {
+                            showNcbiTaxonomy: true,
+                            showUpdatedRelationship: true,
+                        };
+                    }
+                    var parsed = JSON.parse(raw);
+                    return {
+                        showNcbiTaxonomy: parsed.showNcbiTaxonomy !== false,
+                        showUpdatedRelationship: parsed.showUpdatedRelationship !== false,
+                    };
+                } catch (error) {
+                    return {
+                        showNcbiTaxonomy: true,
+                        showUpdatedRelationship: true,
+                    };
+                }
+            }
+
+            function savePreferences(showNcbiTaxonomy, showUpdatedRelationship) {
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify({
+                        showNcbiTaxonomy: showNcbiTaxonomy,
+                        showUpdatedRelationship: showUpdatedRelationship,
+                    }));
+                } catch (error) {
+                }
+            }
+
+            function setVisibility(columns, isVisible) {
+                columns.forEach(function(index) {
+                    dataTableInstance.column(index).visible(isVisible, false);
+                });
+            }
+
+            function applyPreference(changedGroup) {
+                var showNcbiTaxonomy = ncbiToggle.checked;
+                var showUpdatedRelationship = updatedToggle.checked;
+
+                if (!showNcbiTaxonomy && !showUpdatedRelationship) {
+                    if (changedGroup === 'ncbi') {
+                        updatedToggle.checked = true;
+                        showUpdatedRelationship = true;
+                    } else {
+                        ncbiToggle.checked = true;
+                        showNcbiTaxonomy = true;
+                    }
+                }
+
+                setVisibility(ncbiColumns, showNcbiTaxonomy);
+                setVisibility(updatedColumns, showUpdatedRelationship);
+                dataTableInstance.columns.adjust().draw(false);
+                savePreferences(showNcbiTaxonomy, showUpdatedRelationship);
+            }
+
+            var preferences = loadPreferences();
+            ncbiToggle.checked = preferences.showNcbiTaxonomy;
+            updatedToggle.checked = preferences.showUpdatedRelationship;
+
+            ncbiToggle.addEventListener('change', function() {
+                applyPreference('ncbi');
+            });
+            updatedToggle.addEventListener('change', function() {
+                applyPreference('updated');
+            });
+
+            applyPreference();
+        }
+
+        function initBuscoDisplayToggle(tableSelector, dataTableInstance) {
+            var metazoaRadio = document.getElementById('toggleBuscoMetazoa');
+            var lophoRadio = document.getElementById('toggleBuscoLopho');
+            if (!metazoaRadio || !lophoRadio || !window.jQuery || !dataTableInstance) {
+                return;
+            }
+
+            var storageKey = 'annelidadb.buscoDisplayPreference';
+            var $table = window.jQuery(tableSelector);
+            if (!$table.length) {
+                return;
+            }
+
+            var metazoaColumns = [];
+            var lophoColumns = [];
+            $table.find('thead th').each(function(index) {
+                if (this.classList.contains('busco-source-metazoa')) {
+                    metazoaColumns.push(index);
+                }
+                if (this.classList.contains('busco-source-lopho')) {
+                    lophoColumns.push(index);
+                }
+            });
+
+            if (!metazoaColumns.length || !lophoColumns.length) {
+                return;
+            }
+
+            function loadPreference() {
+                try {
+                    var raw = localStorage.getItem(storageKey);
+                    return raw === 'lopho' ? 'lopho' : 'metazoa';
+                } catch (error) {
+                    return 'metazoa';
+                }
+            }
+
+            function savePreference(choice) {
+                try {
+                    localStorage.setItem(storageKey, choice);
+                } catch (error) {
+                }
+            }
+
+            function applyPreference(choice) {
+                var isLopho = (choice === 'lopho');
+                lophoRadio.checked = isLopho;
+                metazoaRadio.checked = !isLopho;
+
+                metazoaColumns.forEach(function(index) {
+                    dataTableInstance.column(index).visible(!isLopho, false);
+                });
+                lophoColumns.forEach(function(index) {
+                    dataTableInstance.column(index).visible(isLopho, false);
+                });
+                dataTableInstance.columns.adjust().draw(false);
+                savePreference(isLopho ? 'lopho' : 'metazoa');
+            }
+
+            var initialChoice = loadPreference();
+            applyPreference(initialChoice);
+
+            metazoaRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    applyPreference('metazoa');
+                }
+            });
+            lophoRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    applyPreference('lopho');
+                }
+            });
+        }
+
+        function getVisibleTableColumns(tableInstance) {
+            var indexes = [];
+            tableInstance.columns(':visible').every(function() {
+                var headerNode = this.header();
+                if (headerNode) {
+                    var headerText = headerNode.textContent.trim();
+                    if (headerText === '' && headerNode.querySelector('input[type="checkbox"]')) {
+                        return;
+                    }
+                }
+                indexes.push(this.index());
+            });
+            return indexes;
+        }
+
+        function getSelectedTableRowNodes(tableInstance) {
+            return Array.from(tableInstance.rows().nodes()).filter(function(rowNode) {
+                return rowNode.querySelector('input.download-row-checkbox:checked, input.download-checkbox:checked');
+            });
+        }
+
+        function getRowCellText(tableInstance, rowNode, columnIndex) {
+            var cellNode = tableInstance.cell(rowNode, columnIndex).node();
+            if (!cellNode) {
+                return '';
+            }
+            return cellNode.textContent.trim().replace(/\s+/g, ' ');
+        }
+
+        function downloadSelectedTableRowsAsCsv(tableInstance, filename) {
+            var selectedRowNodes = getSelectedTableRowNodes(tableInstance);
+            if (!selectedRowNodes.length) {
+                alert('Please select at least one row to export.');
+                return;
+            }
+            var visibleColumns = getVisibleTableColumns(tableInstance);
+            if (!visibleColumns.length) {
+                alert('No visible columns available for export.');
+                return;
+            }
+            var headers = visibleColumns.map(function(index) {
+                var headerNode = tableInstance.column(index).header();
+                return headerNode ? headerNode.textContent.trim() : '';
+            });
+            var rows = selectedRowNodes.map(function(rowNode) {
+                return visibleColumns.map(function(columnIndex) {
+                    return getRowCellText(tableInstance, rowNode, columnIndex);
+                });
+            });
+            var csvRows = [headers].concat(rows).map(function(row) {
+                return row.map(function(cell) {
+                    var text = String(cell || '').replace(/"/g, '""');
+                    return '"' + text + '"';
+                }).join(',');
+            }).join('\r\n');
+            var blob = new Blob([csvRows], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            var url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function setDownloadCartButtonsDisabled(disabled) {
+            var buttons = document.querySelectorAll('#downloadCartDrawer button');
+            buttons.forEach(function(button) {
+                if (button.textContent.trim() === 'Close') {
+                    button.disabled = false;
+                    return;
+                }
+                button.disabled = disabled;
+            });
+        }
+
+        function downloadCartSetStatus(message, busy, progress) {
+            var status = document.getElementById('downloadCartStatus');
+            var messageEl = document.getElementById('downloadCartStatusMessage');
+            var progressEl = document.getElementById('downloadCartProgress');
+            if (!status || !messageEl || !progressEl) {
+                return;
+            }
+            status.classList.remove('d-none');
+            messageEl.textContent = message || '';
+            if (typeof progress === 'number') {
+                progressEl.style.width = Math.min(100, Math.max(0, progress)) + '%';
+            }
+            if (busy) {
+                progressEl.classList.add('progress-bar-animated', 'progress-bar-striped');
+            } else {
+                progressEl.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            }
+            setDownloadCartButtonsDisabled(busy);
+        }
+
+        function downloadCartClearStatus() {
+            var status = document.getElementById('downloadCartStatus');
+            var progressEl = document.getElementById('downloadCartProgress');
+            if (status) {
+                status.classList.add('d-none');
+            }
+            if (progressEl) {
+                progressEl.style.width = '0%';
+            }
+            setDownloadCartButtonsDisabled(false);
+        }
+
+        function downloadCartAddSelected(dataType, selectedItems) {
+            if (!selectedItems || !selectedItems.length) {
+                return false;
+            }
+            var cart = downloadCartGet();
+            if (!cart[dataType]) {
+                cart[dataType] = { label: window.downloadCartLabels[dataType] || dataType, type: dataType, items: {} };
+            }
+            cart[dataType].type = dataType;
+            selectedItems.forEach(function(item) {
+                var itemId = item != null && typeof item === 'object' ? item.id : item;
+                var itemLabel = item != null && typeof item === 'object' ? item.label : item;
+                var itemPath = item != null && typeof item === 'object' ? item.path || itemId : itemId;
+                if (itemId != null && itemId !== '') {
+                    cart[dataType].items[itemId] = { label: itemLabel || itemId, path: itemPath };
+                }
+            });
+            downloadCartSave(cart);
+            downloadCartOpen();
+            return true;
+        }
+
+        function downloadCartAddSelectedFiles(groupKey, groupLabel, selectedItems) {
+            if (!selectedItems || !selectedItems.length) {
+                return false;
+            }
+            var cart = downloadCartGet();
+            if (!cart[groupKey]) {
+                cart[groupKey] = { label: groupLabel || window.downloadCartLabels['selected_files'] || 'Selected Files', type: 'selected_files', items: {} };
+            }
+            selectedItems.forEach(function(item) {
+                var itemId = item != null && typeof item === 'object' ? item.id : item;
+                var itemLabel = item != null && typeof item === 'object' ? item.label : item;
+                var itemPath = item != null && typeof item === 'object' ? item.path || itemId : itemId;
+                if (itemId != null && itemId !== '') {
+                    cart[groupKey].items[itemId] = { label: itemLabel || itemId, path: itemPath };
+                }
+            });
+            downloadCartSave(cart);
+            downloadCartOpen();
+            return true;
+        }
+
+        function downloadCartRemoveGroup(dataType) {
+            var cart = downloadCartGet();
+            if (cart[dataType]) {
+                delete cart[dataType];
+                downloadCartSave(cart);
+            }
+        }
+
+        function downloadCartDownloadGroup(dataType) {
+            var cart = downloadCartGet();
+            var group = cart[dataType];
+            if (!group || !Object.keys(group.items || {}).length) {
+                alert('No items in this download group.');
+                return;
+            }
+            var selected = Object.keys(group.items);
+            var requestType = group.type || dataType;
+            downloadCartOpen();
+            downloadCartSetStatus('Submitting download request, please wait...', true, 0);
+            var formData = new FormData();
+            formData.append('data_type', requestType);
+            selected.forEach(function(itemId) {
+                formData.append('selected', itemId);
+            });
+            formData.append('csrfmiddlewaretoken', getCsrfToken());
+
+            return fetch('/download/batch-job/', {
+                method: 'POST',
+                body: formData,
+            }).then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Server returned error, status: ' + response.status);
+                }
+                return response.json();
+            }).then(function(data) {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                return downloadCartPollJob(data.job_id, data.status_url, dataType);
+            }).catch(function(error) {
+                downloadCartSetStatus('Download request failed: ' + error.message, false, 0);
+            });
+        }
+
+        function downloadCartPollJob(jobId, statusUrl, dataType) {
+            return fetch(statusUrl, { cache: 'no-store' }).then(function(response) {
+                if (!response.ok) {
+                    return response.json().then(function(data) {
+                        throw new Error(data && data.error ? data.error : 'Status query failed, status: ' + response.status);
+                    }).catch(function() {
+                        throw new Error('Status query failed, status: ' + response.status);
+                    });
+                }
+                return response.json();
+            }).then(function(data) {
+                var progress = typeof data.progress === 'number' ? data.progress : null;
+                var message = data.message || 'Preparing download...';
+                if (data.status === 'running' || data.status === 'pending') {
+                    downloadCartSetStatus(message, true, progress !== null ? progress : 10);
+                    return new Promise(function(resolve) {
+                        setTimeout(function() {
+                            resolve(downloadCartPollJob(jobId, statusUrl, dataType));
+                        }, 2000);
+                    });
+                }
+                if (data.status === 'failed') {
+                    downloadCartSetStatus('Download failed: ' + (data.error || message), false, progress || 0);
+                    return;
+                }
+                if (data.status === 'completed' && data.download_url) {
+                    downloadCartSetStatus('Download ready, starting transfer...', false, 100);
+                    downloadCartRemoveGroup(dataType);
+                    var link = document.createElement('a');
+                    link.href = data.download_url;
+                    link.download = '';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    return;
+                }
+                downloadCartSetStatus('Unknown status: ' + data.status, false, progress || 0);
+            }).catch(function(error) {
+                downloadCartSetStatus('Status query failed: ' + error.message, false, 0);
+            });
+        }
+
+        async function downloadCartDownloadAll() {
+            var cart = downloadCartGet();
+            var groups = Object.keys(cart).filter(function(key) { return Object.keys(cart[key].items || {}).length; });
+            if (!groups.length) {
+                alert('Your download bar is empty. Add some items before downloading.');
+                return;
+            }
+            if (groups.length === 1) {
+                return downloadCartDownloadGroup(groups[0]);
+            }
+            if (!confirm('Your download bar contains items from multiple categories. Download each group sequentially?')) {
+                return;
+            }
+            for (var i = 0; i < groups.length; i++) {
+                await downloadCartDownloadGroup(groups[i]);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            downloadCartRender();
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

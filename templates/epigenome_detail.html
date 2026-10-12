@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Epigenome Publication {{ publication.paper_id }} - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="hero-section pb-5">
+    <div class="container text-center">
+        <p class="lead text-white-75">{{ publication.title }}</p>
+    </div>
+</div>
+<div class="container mb-5">
+    <div class="dashboard-section p-4 mb-4">
+        <div class="row g-4">
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="p-4 rounded-4 border border-2 h-100 page-summary-card border-warning">
+                    <h6 class="text-uppercase text-muted mb-2">Year</h6>
+                    <p class="display-6 fw-bold mb-1">{{ publication.year|default:'-' }}</p>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="p-4 rounded-4 border border-2 h-100 page-summary-card border-primary">
+                    <h6 class="text-uppercase text-muted mb-2">Modality</h6>
+                    <p class="display-6 fw-bold mb-1">{{ publication.modality|default:'-' }}</p>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="p-4 rounded-4 border border-2 h-100 page-summary-card border-info">
+                    <h6 class="text-uppercase text-muted mb-2">Species</h6>
+                    <p class="display-6 fw-bold mb-1">{{ publication.species_list|default:'-' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dashboard-section p-4 mb-4">
+        <div class="row g-4">
+            <div class="col-12 col-lg-8">
+                <div class="p-4 rounded-4 bg-light">
+                    <h4 class="fw-bold mb-3">Publication Details</h4>
+                    <p class="mb-2"><strong>DOI:</strong> {% if publication.doi %}<a href="https://doi.org/{{ publication.doi }}" target="_blank" class="text-decoration-none">{{ publication.doi }}</a>{% else %}-{% endif %}</p>
+                    <p class="mb-2"><strong>Source URL:</strong> {% if publication.source_url %}<a href="{{ publication.source_url }}" target="_blank" class="text-decoration-none">Link</a>{% else %}-{% endif %}</p>
+                    <p class="mb-2"><strong>Species:</strong>
+                        {% if publication_species_links %}
+                            {% for species in publication_species_links %}
+                                {% if species.url %}
+                                    <a href="{{ species.url }}" class="badge bg-info text-dark text-decoration-none me-1 mb-1">{{ species.name }}</a>
+                                {% else %}
+                                    <span class="badge bg-secondary text-white me-1 mb-1">{{ species.name }}</span>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}-{% endif %}
+                    </p>
+                    <p class="mb-2"><strong>Authors:</strong> {{ publication.authors|default:'-' }}</p>
+                    <p class="mb-2"><strong>Abstract Excerpt:</strong>
+                        {% if publication.abstract %}
+                            <span id="epigenomeAbstractExcerpt">{{ publication.abstract|truncatechars:280 }}</span>
+                            {% if publication.abstract|length > 280 %}
+                                <a href="#" id="toggleAbstractLink" class="ms-2">Show more</a>
+                            {% endif %}
+                        {% else %}-{% endif %}
+                    </p>
+                    <p class="mb-2"><strong>Accessions:</strong>
+                        {% if accession_links %}
+                            {% for accession in accession_links %}
+                                {% if accession.url %}
+                                    <a href="{{ accession.url }}" target="_blank" class="badge bg-primary text-white text-decoration-none me-1 mb-1">{{ accession.label }}</a>
+                                {% else %}
+                                    <span class="badge bg-secondary text-white me-1 mb-1">{{ accession.label }}</span>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}-{% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="p-4 rounded-4 bg-light">
+                    <h4 class="fw-bold mb-3">Related Species</h4>
+                    <ul class="list-unstyled mb-0">
+                        {% for species in related_species %}
+                        <li>{{ species }}</li>
+                        {% empty %}
+                        <li class="text-muted">None</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dashboard-section p-4">
+        <h4 class="fw-bold mb-3">Study Records</h4>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle w-100">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order</th>
+                        <th>Family</th>
+                        <th>Species</th>
+                        <th>Modality</th>
+                        <th>Tissue</th>
+                        <th>Stage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in records %}
+                    <tr>
+                        <td>{{ row.order|default:'-' }}</td>
+                        <td>{{ row.family|default:'-' }}</td>
+                        <td>
+                            {% if row.species_url %}
+                                <a href="{{ row.species_url }}" class="text-decoration-none">{{ row.species|default:'-' }}</a>
+                            {% else %}
+                                {{ row.species|default:'-' }}
+                            {% endif %}
+                        </td>
+                        <td>{{ row.modality|default:'-' }}</td>
+                        <td>{{ row.tissue|default:'-' }}</td>
+                        <td>{{ row.stage|default:'-' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not records %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">No epigenome records found for this publication.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var toggleLink = document.getElementById('toggleAbstractLink');
+    if (!toggleLink) return;
+    var excerpt = document.getElementById('epigenomeAbstractExcerpt');
+    var fullText = {{ publication.abstract|default:'""'|escapejs }};
+    var showingFull = false;
+    toggleLink.addEventListener('click', function(event) {
+        event.preventDefault();
+        showingFull = !showingFull;
+        excerpt.textContent = showingFull ? fullText : fullText.substring(0, 280) + (fullText.length > 280 ? '...' : '');
+        toggleLink.textContent = showingFull ? 'Show less' : 'Show more';
+    });
+});
+</script>
+{% endblock %}

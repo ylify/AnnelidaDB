@@ -1,0 +1,1032 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title|default:"Species Hub" }} - AnnelidaDB{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" />
+<style>
+    .gbif-photos { overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; min-height: 0; max-height: 100%; }
+    .gbif-photos a { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
+    .gbif-photos img { display: block; width: 100%; height: auto; max-width: 100%; object-fit: contain; }
+    .backbone-distribution-card { overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+    .backbone-distribution-card .card-body-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    #gbifOccurrenceMap { width: 100%; flex: 1; min-height: 320px; max-height: 560px; border-radius: 16px; overflow: hidden; }
+    .gbif-map-box { display: flex; flex-direction: column; flex: 1; min-height: 430px; max-height: 560px; }
+    .gbif-map-status { line-height: 1.4; }
+    #gbifPhotosSection { display: flex; flex-direction: column; min-height: 0; height: 100%; max-height: 560px; }
+    .gbif-card-body { flex: 1; min-height: 0; overflow: hidden; }
+    .rapid-view-panel { display: none; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.75rem; }
+    .rapid-view-active { display: block; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="page-title text-center mb-5">
+        <h1 class="display-5 fw-bold"><i>{{ tax.species }}</i></h1>
+    </div>
+    <div class="row gx-4 gy-4 mb-4">
+        <div class="col-lg-8">
+            <div id="speciesOverviewCard" class="dashboard-section p-4">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h2 class="h4 fw-bold mb-2">Species Overview</h2>
+                        {% if updated_taxonomy_line %}
+                        <p class="text-secondary mb-1 fw-semibold">Updated relationship: {{ updated_taxonomy_line }}</p>
+                        {% endif %}
+                    </div>
+                    <a href="javascript:history.back()" class="btn btn-outline-info btn-sm"><i class="fas fa-arrow-left me-2"></i>Back</a>
+                </div>
+                <div class="mb-3" style="border-bottom: 1px dashed #dee2e6;"></div>
+                <p class="text-secondary mb-3">NCBI Taxonomy ID: <strong>{{ tax.ncbi_taxonomy_id }}</strong></p>
+                <div class="row g-2">
+                    <div class="col-sm-6 col-lg-4"><div class="p-2 rounded-4 bg-light"><h6 class="mb-1">Phylum</h6><p class="mb-0 text-secondary small">{{ tax.phylum|default:"Unassigned" }}</p></div></div>
+                    <div class="col-sm-6 col-lg-4"><div class="p-2 rounded-4 bg-light"><h6 class="mb-1">Class</h6><p class="mb-0 text-secondary small">{{ tax.class_name|default:"Unassigned" }}</p></div></div>
+                    <div class="col-sm-6 col-lg-4"><div class="p-2 rounded-4 bg-light"><h6 class="mb-1">Order</h6><p class="mb-0 text-secondary small">{{ tax.order|default:"Unassigned" }}</p></div></div>
+                    <div class="col-sm-6 col-lg-4"><div class="p-2 rounded-4 bg-light"><h6 class="mb-1">Family</h6><p class="mb-0 text-secondary small">{{ tax.family|default:"Unassigned" }}</p></div></div>
+                    <div class="col-sm-6 col-lg-4"><div class="p-2 rounded-4 bg-light"><h6 class="mb-1">Genus</h6><p class="mb-0 text-secondary small"><i>{{ tax.genus|default:"Unassigned" }}</i></p></div></div>
+                </div>
+                <div class="row g-3 mt-3">
+                    <div class="col-sm-6"><div class="p-3 rounded-4 bg-light"><h5 class="mb-1">Habitat</h5><p id="speciesHabitat" class="mb-0 text-secondary">Loading WoRMS habitat...</p></div></div>
+                    <div class="col-sm-6"><div class="p-3 rounded-4 bg-light"><h5 class="mb-1">Sample depth</h5><p id="speciesDepth" class="mb-0 text-secondary">Loading OBIS sample depth...</p></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="dashboard-section p-4 h-100">
+                <h2 class="h5 fw-bold mb-4">External Links</h2>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-3 py-3 d-flex align-items-center justify-content-between">
+                        <a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id={{ tax.ncbi_taxonomy_id }}" target="_blank" class="text-decoration-none"><i class="fas fa-database me-2 text-info"></i>NCBI Taxonomy</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRapidView('ncbi')">Rapid view</button>
+                    </div>
+                    <div id="ncbiRapidView" class="rapid-view-panel px-3 py-3 mb-3">Loading NCBI classification...</div>
+                    {% if tax.worms_id %}
+                    <div class="list-group-item px-3 py-3 d-flex align-items-center justify-content-between">
+                        <a href="https://www.marinespecies.org/aphia.php?p=taxdetails&id={{ tax.worms_id }}" target="_blank" class="text-decoration-none"><i class="fas fa-water me-2 text-primary"></i>WoRMS</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRapidView('worms')">Rapid view</button>
+                    </div>
+                    <div id="wormsRapidView" class="rapid-view-panel px-3 py-3 mb-3">Loading WoRMS classification...</div>
+                    <div class="list-group-item px-3 py-3 d-flex align-items-center justify-content-between">
+                        <a href="https://obis.org/taxon/{{ tax.worms_id }}" target="_blank" class="text-decoration-none"><i class="fas fa-water me-2 text-info"></i>OBIS</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRapidView('obis')">Rapid view</button>
+                    </div>
+                    <div id="obisRapidView" class="rapid-view-panel px-3 py-3 mb-3">Loading OBIS depth summary...</div>
+                    {% else %}
+                    <div class="list-group-item px-3 py-3 text-muted"><i class="fas fa-ban me-2"></i>No WoRMS ID</div>
+                    {% endif %}
+                    {% if tax.gbif_id %}
+                    <div class="list-group-item px-3 py-3 d-flex align-items-center justify-content-between">
+                        <a href="https://www.gbif.org/species/{{ tax.gbif_id }}" target="_blank" class="text-decoration-none"><i class="fas fa-leaf me-2 text-success"></i>GBIF</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleRapidView('gbif')">Rapid view</button>
+                    </div>
+                    <div id="gbifRapidView" class="rapid-view-panel px-3 py-3 mb-3">Loading GBIF classification...</div>
+                    {% else %}
+                    <div class="list-group-item px-3 py-3 text-muted"><i class="fas fa-ban me-2"></i>No GBIF Key</div>
+                    {% endif %}
+                </div>
+                <!-- GBIF sidebar overview removed per layout change request -->
+            </div>
+        </div>
+    </div>
+    {% if gbif_id %}
+    <div class="dashboard-section p-4 mb-5">
+        <div class="row gx-4 gy-4 align-items-stretch">
+            <div id="gbifMapColumn" class="col-lg-8 d-flex">
+                <div class="p-3 rounded-4 bg-light h-100 backbone-distribution-card w-100">
+                    <h5 class="mb-3">Backbone Distribution</h5>
+                    <div class="card-body-wrapper">
+                        <div id="gbifMapSection" class="mb-3 gbif-map-box">
+                            <h6 class="mb-2">GBIF Occurrence Map</h6>
+                            <div id="gbifOccurrenceMap"></div>
+                            <div id="gbifMapStatus" class="small text-secondary mt-2 gbif-map-status">Map points are sourced from GBIF occurrence coordinates for this taxon. Backbone Distribution.tsv contains locality metadata only.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="gbifPhotosColumn" class="col-lg-4 d-flex">
+                <div id="gbifPhotosSection" class="p-3 rounded-4 bg-light h-100 d-flex flex-column w-100">
+                    <h5 class="mb-3">Photos from GBIF</h5>
+                    <div id="gbifPhotoContainer" class="gbif-photos">
+                        <div class="text-secondary">Loading GBIF photos if available...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <div class="dashboard-section p-4 mb-5">
+        <h2 class="h5 fw-bold mb-3">Publication References</h2>
+        {% if publications %}
+        <ul class="list-group list-group-flush">
+            {% for pub in publications %}
+            <li class="list-group-item px-0 py-3">
+                <div class="fw-semibold">{{ pub.title|default:'Untitled publication'|safe }}</div>
+                <div class="small text-secondary">
+                    <i>{{ pub.journal|default:'Unknown journal' }}</i>{% if pub.publication_date %} · {{ pub.publication_date }}{% endif %}
+                </div>
+                {% if pub.doi %}
+                <div class="small mt-1"><a href="https://doi.org/{{ pub.doi }}" target="_blank">{{ pub.doi }}</a></div>
+                {% endif %}
+                {% if pub.authors %}
+                <div class="small text-muted mt-1">Authors: {{ pub.authors }}</div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted">No publication data found for this species.</div>
+        {% endif %}
+    </div>
+    <div class="dashboard-section p-4 mb-5">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+            <div><h2 class="h4 fw-bold mb-1">Multi-Omics Dashboard</h2><p class="text-secondary mb-0">Use the buttons below to quickly switch between omics details.</p></div>
+            <div class="btn-group tab-btn-group" role="group" aria-label="Tabs">
+                <button type="button" class="btn btn-outline-secondary active {% if genome %}fw-bold{% endif %}" id="tab-genome" onclick="switchTab('genome')">Genome</button>
+                <button type="button" class="btn btn-outline-secondary {% if mitogenome %}fw-bold{% endif %}" id="tab-mitogenome" onclick="switchTab('mitogenome')">Mitogenome</button>
+                <button type="button" class="btn btn-outline-secondary {% if has_proteome %}fw-bold{% endif %}" id="tab-proteome" onclick="switchTab('proteome')">Proteome</button>
+                <button type="button" class="btn btn-outline-secondary {% if has_epigenome or has_epigenome_csv %}fw-bold{% endif %}" id="tab-epigenome" onclick="switchTab('epigenome')">Epigenome</button>
+                <button type="button" class="btn btn-outline-secondary {% if has_transcriptome %}fw-bold{% endif %}" id="tab-transcriptome" onclick="switchTab('transcriptome')">Transcriptome</button>
+                <button type="button" class="btn btn-outline-secondary {% if has_singlecell %}fw-bold{% endif %}" id="tab-singlecell" onclick="switchTab('singlecell')">Single-cell</button>
+                <button type="button" class="btn btn-outline-secondary {% if has_symbiont %}fw-bold{% endif %}" id="tab-symbiont" onclick="switchTab('symbiont')">Symbiont</button>
+            </div>
+        </div>
+        <div id="content-genome" class="tab-pane active">
+            {% if genome %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-dna text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Genome Assembly Available</h3>
+                <p class="text-secondary mb-4">Assembly size <strong>{{ genome.size_mb|default:'-' }} Mb</strong> · GC content <strong>{{ genome.gc_content|default:'-' }}%</strong>.</p>
+                <a href="{% url 'genome_detail' tax.ncbi_taxonomy_id|default:tax.species %}" class="btn btn-primary btn-lg px-5">View Genome Details</a>
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-dna fa-3x mb-3"></i>
+                <p>No Genome data available for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-mitogenome" class="tab-pane d-none">
+            {% if mitogenome %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-circle-notch text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Mitogenome Records Available</h3>
+                <p class="text-secondary mb-4">Length <strong>{{ mitogenome.length_bp|default:'-' }} bp</strong> · Topology <strong>{{ mitogenome.topology|default:'-' }}</strong>.</p>
+                <a href="{% url 'mitogenome_detail' tax.ncbi_taxonomy_id|default:tax.species %}" class="btn btn-primary btn-lg px-5">View Mitogenome Details</a>
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-circle-notch fa-3x mb-3"></i>
+                <p>No Mitogenome data available for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-proteome" class="tab-pane d-none">
+            {% if has_proteome %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-dna text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Proteome Data Available</h3>
+                {% if proteome_link %}
+                <p class="text-secondary mb-4">External proteome resources are available for this species.</p>
+                <a href="{{ proteome_link }}" target="_blank" class="btn btn-primary btn-lg px-5">View Proteome Data</a>
+                {% endif %}
+                {% if has_proteome_csv %}
+                <div class="mt-5 text-start">
+                    <h4 class="fw-bold">Proteome CSV 数据</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle w-100">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Modality</th>
+                                    <th>Tissue</th>
+                                    <th>Stage</th>
+                                    <th>Publication</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in proteome_csv_records %}
+                                <tr>
+                                    <td>{{ row.modality|default:'-' }}</td>
+                                    <td>{{ row.tissue|default:'-' }}</td>
+                                    <td>{{ row.stage|default:'-' }}</td>
+                                    <td>
+                                        {% if row.paper_id %}
+                                        <a href="{% url 'proteome_detail_page' row.paper_id %}" class="text-decoration-none">{{ row.paper_id }}</a>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-dna fa-3x mb-3"></i>
+                <p>No Proteome data available for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-epigenome" class="tab-pane d-none">
+            {% if has_epigenome or has_epigenome_csv %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-dna text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Epigenome Data Available</h3>
+                {% if external_epigenome_link %}
+                <p class="text-secondary mb-4">External epigenome resources are available for this species.</p>
+                <a href="{{ external_epigenome_link }}" target="_blank" class="btn btn-primary btn-lg px-5">View Epigenome Data</a>
+                {% endif %}
+                {% if has_epigenome_csv %}
+                <div class="mt-5 text-start">
+                    <h4 class="fw-bold">Epigenome CSV 数据</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle w-100">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Modality</th>
+                                    <th>Study</th>
+                                    <th>Publication</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in epigenome_csv_records %}
+                                <tr>
+                                    <td>{{ row.modality|default:'-' }}</td>
+                                    <td>{{ row.title|default:'-' }}</td>
+                                    <td>
+                                        {% if row.paper_id %}
+                                        <a href="{% url 'epigenome_detail_page' row.paper_id %}" class="text-decoration-none">{{ row.paper_id }}</a>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-dna fa-3x mb-3"></i>
+                <p>No Epigenome data available for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-transcriptome" class="tab-pane d-none">
+            {% if has_transcriptome %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-wave-square text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Transcriptome / RNA Data</h3>
+                <p class="text-secondary mb-4">External transcriptome data is available for this species.</p>
+                <a href="{% url 'transcriptome_page' %}?taxid={{ tax.ncbi_taxonomy_id|default:tax.species }}" class="btn btn-primary btn-lg px-5">Access Transcriptome Data</a>
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-wave-square fa-3x mb-3"></i>
+                <p>No Transcriptome data available for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-singlecell" class="tab-pane d-none">
+            {% if has_singlecell %}
+                {% if has_umap %}
+                <div class="dashboard-section p-4 mb-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h3 class="h5 fw-bold mb-1">Single-cell UMAP</h3>
+                            <p class="text-secondary mb-0">Interactive UMAP visualization generated from single-cell data.</p>
+                        </div>
+                        {% if umap_datasets|length > 1 %}
+                        <div class="w-100 w-md-auto">
+                            <select id="umapDatasetSelect" class="form-select form-select-sm">
+                                {% for ds in umap_datasets %}
+                                <option value="{{ ds.url }}">{{ ds.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div id="umapChart" style="min-height:500px; width:100%;"></div>
+                    <div id="umapMessage" class="text-secondary small mt-2"></div>
+                </div>
+                {% endif %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-microscope text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Single-cell Data Available</h3>
+                <p class="text-secondary mb-4">Found <strong>{{ singlecell_count }}</strong> single-cell dataset{{ singlecell_count|pluralize }} for this species.</p>
+                <div class="d-flex flex-column gap-2 align-items-center mb-3">
+                    {% for dataset in singlecell_datasets %}
+                    <a href="{% url 'singlecell_detail' pk=dataset.id %}" class="btn btn-outline-primary px-4">{{ dataset.tissue|default:'Tissue' }} · {{ dataset.stage|default:'Stage' }} · {{ dataset.year|default:'Year' }}</a>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'singlecell_page' %}" class="btn btn-primary btn-lg px-5">Browse All Single-cell Records</a>
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-microscope fa-3x mb-3"></i>
+                <p>No Single-cell records found for this species.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="content-symbiont" class="tab-pane d-none">
+            {% if has_symbiont %}
+            <div class="text-center py-6">
+                <div class="mb-4 rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width:88px; height:88px;">
+                    <i class="fas fa-bacterium text-info fa-2x"></i>
+                </div>
+                <h3 class="h5 fw-bold mb-2">Symbiont Records Found</h3>
+                <p class="text-secondary mb-4">Associated symbionts are available for <strong>{{ tax.species }}</strong>.</p>
+                <a href="{% url 'symbiont_detail' tax.ncbi_taxonomy_id|default:tax.species %}" class="btn btn-primary btn-lg px-5">View Symbiont Details</a>
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-secondary">
+                <i class="fas fa-bacterium fa-3x mb-3"></i>
+                <p>No Symbiont records found for this host.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+<script>
+    async function fetchGbifOccurrences(gbifId) {
+        const apiUrl = `/api/gbif/occurrences/${gbifId}/`;
+        const response = await fetch(apiUrl);
+        const payload = await response.json();
+        if (!response.ok) {
+            const message = (payload && payload.error) || (payload && payload.message) || response.statusText || 'Unknown error';
+            throw new Error(`GBIF occurrence fetch failed: ${message}`);
+        }
+        return {
+            points: Array.isArray(payload.points) ? payload.points : [],
+            source: payload.cached ? 'local cache' : 'local API',
+        };
+    }
+
+    let gbifMapInstance = null;
+
+    async function renderGbifOccurrenceMap(gbifId) {
+        const mapWrapper = document.getElementById('gbifMapSection');
+        const mapEl = document.getElementById('gbifOccurrenceMap');
+        if (!mapEl || !mapWrapper) {
+            return;
+        }
+
+        if (!gbifId) {
+            mapEl.innerHTML = '<div class="p-4 text-secondary">No GBIF key available for occurrence map.</div>';
+            const statusEl = document.getElementById('gbifMapStatus');
+            if (statusEl) {
+                statusEl.textContent = 'No GBIF key available for this taxon.';
+            }
+            return;
+        }
+
+        const statusEl = document.getElementById('gbifMapStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Loading GBIF occurrence map via MAPLibre...';
+        }
+
+        try {
+            const occurrenceResult = await fetchGbifOccurrences(gbifId);
+            const points = Array.isArray(occurrenceResult.points) ? occurrenceResult.points : [];
+            if (!points.length) {
+                mapEl.innerHTML = '<div class="p-4 text-secondary">No GBIF occurrence data was found for this taxon.</div>';
+                if (statusEl) {
+                    statusEl.textContent = 'No GBIF occurrence data available for this taxon.';
+                }
+                return;
+            }
+
+            mapEl.innerHTML = '';
+            const baseTileUrl = 'https://tile.gbif.org/3857/omt/{z}/{x}/{y}@1x.png?style=gbif-light';
+            const map = new maplibregl.Map({
+                container: mapEl,
+                style: {
+                    version: 8,
+                    sources: {
+                        gbif_base: {
+                            type: 'raster',
+                            tiles: [baseTileUrl],
+                            tileSize: 256,
+                            attribution: '© GBIF, © OpenStreetMap contributors'
+                        }
+                    },
+                    layers: [
+                        {
+                            id: 'gbif-base',
+                            type: 'raster',
+                            source: 'gbif_base'
+                        }
+                    ]
+                },
+                center: [0, 20],
+                zoom: 2,
+                attributionControl: true,
+            });
+            gbifMapInstance = map;
+            map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+
+            const features = points.map((point, index) => {
+                const lat = Number(point[0]);
+                const lon = Number(point[1]);
+                return {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [Number(lon), Number(lat)]
+                    },
+                    properties: {
+                        id: index
+                    }
+                };
+            }).filter(feature => Number.isFinite(feature.geometry.coordinates[0]) && Number.isFinite(feature.geometry.coordinates[1]));
+
+            const geojson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            map.on('load', () => {
+                map.addSource('gbif_occurrences', {
+                    type: 'geojson',
+                    data: geojson
+                });
+
+                map.addLayer({
+                    id: 'gbif-occurrence-dots',
+                    type: 'circle',
+                    source: 'gbif_occurrences',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#1f78b4',
+                        'circle-stroke-color': '#ffffff',
+                        'circle-stroke-width': 1,
+                        'circle-opacity': 0.85
+                    }
+                });
+
+                if (features.length) {
+                    const bounds = new maplibregl.LngLatBounds();
+                    features.forEach((feature) => {
+                        bounds.extend(feature.geometry.coordinates);
+                    });
+                    map.fitBounds(bounds, { padding: 20, maxZoom: 5 });
+                }
+                map.resize();
+            });
+
+            if (statusEl) {
+                statusEl.textContent = `Loaded GBIF occurrence map with ${points.length} records using MAPLibre.`;
+            }
+        } catch (error) {
+            console.error('Failed to load GBIF occurrence map via MAPLibre:', error);
+            mapEl.innerHTML = '<div class="p-4 text-danger">Failed to load GBIF MAPs map data.</div>';
+            if (statusEl) {
+                statusEl.textContent = 'GBIF occurrence MAPs API map failed to load.';
+            }
+        }
+    }
+
+    async function loadGbifImages(gbifId) {
+        const photoContainer = document.getElementById('gbifPhotoContainer');
+        if (!photoContainer) {
+            return;
+        }
+
+        if (!gbifId) {
+            photoContainer.innerHTML = '<div class="text-secondary">No GBIF key available for photo fetch.</div>';
+            alignGbifCardHeights();
+            return;
+        }
+
+        photoContainer.innerHTML = '<div class="text-secondary">Loading GBIF photos...</div>';
+        try {
+            const response = await fetch(`/api/gbif/images/${gbifId}/`);
+            const payload = await response.json();
+            if (!response.ok) {
+                const message = (payload && payload.error) || (payload && payload.message) || response.statusText || 'Unknown error';
+                throw new Error(`GBIF photo fetch failed: ${message}`);
+            }
+
+            const images = Array.isArray(payload.images) ? payload.images : [];
+            if (!images.length) {
+                photoContainer.innerHTML = '<div class="text-secondary">No GBIF photos found for this taxon.</div>';
+                alignGbifCardHeights();
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            const info = document.createElement('div');
+            info.className = 'small text-secondary mb-2';
+            info.textContent = `Photos from GBIF (showing ${Math.min(images.length, 1)} of ${images.length})`;
+            fragment.appendChild(info);
+
+            const displayImages = images.slice(0, 1);
+            displayImages.forEach((img) => {
+                const imageUrl = (img.url || '').replace(/^http:\/\//i, 'https://');
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                const image = document.createElement('img');
+                image.src = imageUrl;
+                image.alt = '{{ tax.species|escapejs }}';
+                image.loading = 'lazy';
+                image.decoding = 'async';
+                image.crossOrigin = 'anonymous';
+                image.addEventListener('error', () => {
+                    image.style.display = 'none';
+                });
+                link.appendChild(image);
+                fragment.appendChild(link);
+            });
+
+            if (images.length > 1) {
+                const more = document.createElement('div');
+                more.className = 'small mt-1';
+                more.innerHTML = `<a href="https://www.gbif.org/species/${gbifId}" target="_blank" rel="noopener noreferrer">+${images.length - 1} more on GBIF</a>`;
+                fragment.appendChild(more);
+            }
+
+            photoContainer.innerHTML = '';
+            photoContainer.appendChild(fragment);
+            alignGbifCardHeights();
+        } catch (error) {
+            console.error('Failed to load GBIF images:', error);
+            photoContainer.innerHTML = `<div class="text-danger">Failed to load GBIF photos. ${error.message || ''}</div>`;
+            alignGbifCardHeights();
+        }
+    }
+
+    function createTaxonomyList(items) {
+        if (!items || !items.length) {
+            return '<div class="text-secondary">No classification details available.</div>';
+        }
+        return `<ul class="list-unstyled mb-0">${items.map(item => `<li><strong>${item.rank || 'Rank'}</strong>: ${item.scientific_name || item.scientificname || '-'}${item.taxid ? ` <span class="text-muted">(${item.taxid})</span>` : ''}</li>`).join('')}</ul>`;
+    }
+
+    function renderTaxonomyCard(containerId, html) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleRapidView(key) {
+        const panel = document.getElementById(`${key}RapidView`);
+        if (!panel) {
+            return;
+        }
+        panel.classList.toggle('rapid-view-active');
+    }
+
+    async function loadObisDepth(wormsId, scientificName) {
+        const depthEl = document.getElementById('speciesDepth');
+        const panel = document.getElementById('obisRapidView');
+        if (depthEl) {
+            depthEl.textContent = 'Loading OBIS sample depth...';
+        }
+        if (panel) {
+            panel.innerHTML = 'Loading OBIS depth summary...';
+        }
+        if (!wormsId || !scientificName) {
+            if (depthEl) {
+                depthEl.textContent = 'OBIS sample depth unavailable.';
+            }
+            if (panel) {
+                panel.innerHTML = '<div class="text-secondary">OBIS depth information requires a WoRMS ID and scientific name.</div>';
+            }
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/obis/depth/${wormsId}/?scientific_name=${encodeURIComponent(scientificName)}`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error((payload && payload.error) || (payload && payload.message) || response.statusText || 'Failed to load OBIS depth');
+            }
+            const data = payload.data || {};
+            const count = data.count || 0;
+            let depthText = 'No OBIS depth records found.';
+            if (count > 0) {
+                const min = Number(data.min_depth).toFixed(1);
+                const max = Number(data.max_depth).toFixed(1);
+                const mean = Number(data.mean_depth).toFixed(1);
+                depthText = `${min}–${max} m (${count} records)`;
+                if (panel) {
+                    panel.innerHTML = `<div class="small mb-2"><strong>Depth records:</strong> ${count}</div><div class="small mb-2"><strong>Min depth:</strong> ${min} m</div><div class="small mb-2"><strong>Max depth:</strong> ${max} m</div><div class="small mb-2"><strong>Mean depth:</strong> ${mean} m</div><div class="small mt-2 text-muted">Source: OBIS occurrence data sample.</div>`;
+                }
+            } else {
+                if (panel) {
+                    panel.innerHTML = '<div class="text-secondary">No OBIS depth records were found for this taxon.</div>';
+                }
+            }
+            if (depthEl) {
+                depthEl.textContent = depthText;
+            }
+        } catch (error) {
+            console.error('Failed to load OBIS depth:', error);
+            if (depthEl) {
+                depthEl.textContent = 'Failed to load OBIS sample depth.';
+            }
+            if (panel) {
+                panel.innerHTML = `<div class="text-danger">${error.message || 'Failed to load OBIS depth summary.'}</div>`;
+            }
+        }
+    }
+
+    async function loadWormsTaxonomy(wormsId) {
+        const containerId = 'wormsRapidView';
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+        if (!wormsId) {
+            renderTaxonomyCard(containerId, '<div class="text-secondary">No WoRMS ID available.</div>');
+            return;
+        }
+
+        renderTaxonomyCard(containerId, '<div class="text-secondary">Loading WoRMS data...</div>');
+        try {
+            const response = await fetch(`/api/worms/taxonomy/${wormsId}/`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error((payload && payload.error) || (payload && payload.message) || response.statusText || 'Failed to load WoRMS taxonomy');
+            }
+            const data = payload.data || {};
+            const env = Array.isArray(data.environment) && data.environment.length ? data.environment.join(', ') : 'Unknown';
+            const classification = createTaxonomyList(data.classification || []);
+            const html = `
+                <div class="small mb-2"><strong>Scientific name:</strong> ${data.scientific_name || '-'} </div>
+                <div class="small mb-2"><strong>Rank:</strong> ${data.rank || '-'} </div>
+                <div class="small mb-2"><strong>Status:</strong> ${data.status || '-'} </div>
+                <div class="small mb-2"><strong>Environment:</strong> ${env}</div>
+                <div class="small mb-2"><strong>Classification:</strong></div>
+                ${classification}
+                <div class="small mt-2"><a href="${data.worms_url || '#'}" target="_blank" rel="noopener noreferrer">View on WoRMS</a></div>
+            `;
+            renderTaxonomyCard(containerId, html);
+            const habitatEl = document.getElementById('speciesHabitat');
+            if (habitatEl) {
+                habitatEl.textContent = env;
+            }
+        } catch (error) {
+            renderTaxonomyCard(containerId, `<div class="text-danger">${error.message || 'Failed to load WoRMS taxonomy.'}</div>`);
+            console.error('WoRMS taxonomy fetch error:', error);
+        }
+    }
+
+    async function loadNcbiTaxonomy(ncbiId) {
+        const containerId = 'ncbiRapidView';
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+        if (!ncbiId) {
+            renderTaxonomyCard(containerId, '<div class="text-secondary">No NCBI taxonomy ID available.</div>');
+            return;
+        }
+
+        renderTaxonomyCard(containerId, '<div class="text-secondary">Loading NCBI data...</div>');
+        try {
+            const response = await fetch(`/api/ncbi/taxonomy/${ncbiId}/`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error((payload && payload.error) || (payload && payload.message) || response.statusText || 'Failed to load NCBI taxonomy');
+            }
+            const data = payload.data || {};
+            const classification = createTaxonomyList(data.classification || []);
+            const html = `
+                <div class="small mb-2"><strong>Scientific name:</strong> ${data.scientific_name || '-'} </div>
+                <div class="small mb-2"><strong>Rank:</strong> ${data.rank || '-'} </div>
+                <div class="small mb-2"><strong>Division:</strong> ${data.division || '-'} </div>
+                <div class="small mb-2"><strong>Classification:</strong></div>
+                ${classification}
+                <div class="small mt-2"><a href="${data.ncbi_url || '#'}" target="_blank" rel="noopener noreferrer">View on NCBI</a></div>
+            `;
+            renderTaxonomyCard(containerId, html);
+        } catch (error) {
+            renderTaxonomyCard(containerId, `<div class="text-danger">${error.message || 'Failed to load NCBI taxonomy.'}</div>`);
+            console.error('NCBI taxonomy fetch error:', error);
+        }
+    }
+
+    async function loadGbifSpeciesInfo(gbifId) {
+        const containerId = 'gbifRapidView';
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+        if (!gbifId) {
+            renderTaxonomyCard(containerId, '<div class="text-secondary">No GBIF taxon key available.</div>');
+            return;
+        }
+
+        renderTaxonomyCard(containerId, '<div class="text-secondary">Loading GBIF data...</div>');
+        try {
+            const response = await fetch(`/api/gbif/species/${gbifId}/`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error((payload && payload.error) || (payload && payload.message) || response.statusText || 'Failed to load GBIF species info');
+            }
+            const data = payload.data || {};
+            const classification = [`<strong>Kingdom</strong>: ${data.kingdom || '-'} `, `<strong>Phylum</strong>: ${data.phylum || '-'} `, `<strong>Class</strong>: ${data.class_name || '-'} `, `<strong>Order</strong>: ${data.order || '-'} `, `<strong>Family</strong>: ${data.family || '-'} `, `<strong>Genus</strong>: ${data.genus || '-'} `, `<strong>Species</strong>: ${data.species || '-'} `];
+            const html = `
+                <div class="small mb-2"><strong>Scientific name:</strong> ${data.scientific_name || '-'} </div>
+                <div class="small mb-2"><strong>Rank:</strong> ${data.rank || '-'} </div>
+                <div class="small mb-2"><strong>Status:</strong> ${data.status || '-'} </div>
+                <div class="small mb-2"><strong>Origin:</strong> ${data.origin || '-'} </div>
+                <div class="small mb-2"><strong>GBIF classification:</strong></div>
+                <ul class="list-unstyled mb-0">${classification.map(item => `<li>${item}</li>`).join('')}</ul>
+                <div class="small mt-2"><a href="${data.gbif_url || '#'}" target="_blank" rel="noopener noreferrer">View on GBIF</a></div>
+            `;
+            renderTaxonomyCard(containerId, html);
+        } catch (error) {
+            renderTaxonomyCard(containerId, `<div class="text-danger">${error.message || 'Failed to load GBIF taxonomy.'}</div>`);
+            console.error('GBIF species fetch error:', error);
+        }
+    }
+
+    function alignGbifCardHeights() {
+        const mapColumn = document.getElementById('gbifMapColumn');
+        const photoColumn = document.getElementById('gbifPhotosColumn');
+        if (!mapColumn || !photoColumn) {
+            return;
+        }
+
+        const mapHeight = mapColumn.clientHeight;
+        const photoHeight = photoColumn.clientHeight;
+        const targetHeight = Math.max(mapHeight, photoHeight);
+
+        mapColumn.style.minHeight = `${targetHeight}px`;
+        photoColumn.style.minHeight = `${targetHeight}px`;
+    }
+
+    function debounce(fn, ms) {
+        let timer;
+        return function() {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn(), ms);
+        };
+    }
+
+    function loadEchartsLibrary(callback) {
+        if (typeof echarts !== 'undefined') {
+            callback();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
+        script.onload = callback;
+        script.onerror = () => {
+            const messageEl = document.getElementById('umapMessage');
+            if (messageEl) {
+                messageEl.textContent = 'Failed to load ECharts library for UMAP visualization.';
+            }
+        };
+        document.head.appendChild(script);
+    }
+
+    function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let value = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i += 1) {
+            const char = text[i];
+            if (inQuotes) {
+                if (char === '"') {
+                    if (text[i + 1] === '"') {
+                        value += '"';
+                        i += 1;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    value += char;
+                }
+            } else if (char === '"') {
+                inQuotes = true;
+            } else if (char === ',') {
+                row.push(value);
+                value = '';
+            } else if (char === '\r') {
+                continue;
+            } else if (char === '\n') {
+                row.push(value);
+                rows.push(row);
+                row = [];
+                value = '';
+            } else {
+                value += char;
+            }
+        }
+        if (value !== '' || row.length) {
+            row.push(value);
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    let umapChartInstance = null;
+    let umapInitialized = false;
+    const umapDatasets = {{ umap_datasets_json|safe }};
+
+    function renderUmapChart(datasetUrl) {
+        const messageEl = document.getElementById('umapMessage');
+        if (messageEl) {
+            messageEl.textContent = 'Loading UMAP data...';
+        }
+        if (!datasetUrl) {
+            if (messageEl) {
+                messageEl.textContent = 'No UMAP dataset selected.';
+            }
+            return;
+        }
+
+        const chartEl = document.getElementById('umapChart');
+        if (!chartEl) {
+            return;
+        }
+
+        if (!window.echarts) {
+            loadEchartsLibrary(() => renderUmapChart(datasetUrl));
+            return;
+        }
+
+        if (umapChartInstance) {
+            umapChartInstance.dispose();
+        }
+        umapChartInstance = echarts.init(chartEl, null, { renderer: 'canvas' });
+        umapChartInstance.showLoading();
+
+        fetch(datasetUrl)
+            .then(response => response.text())
+            .then(text => {
+                const rows = parseCsv(text).filter(row => row.length);
+                if (rows.length < 2) {
+                    throw new Error('UMAP file is empty or invalid.');
+                }
+                const header = rows[0].map(h => h.trim());
+                const xIndex = header.findIndex(h => /^UMAP_?1$/i.test(h));
+                const yIndex = header.findIndex(h => /^UMAP_?2$/i.test(h));
+                const typeIndex = header.findIndex(h => /Cell[_ ]?Type|Cluster|cell_type/i.test(h));
+                const labelIndex = header.findIndex(h => /Cell[_ ]?Barcode|Barcode|cell/i.test(h));
+
+                if (xIndex === -1 || yIndex === -1) {
+                    throw new Error('UMAP_1 and UMAP_2 columns were not found.');
+                }
+
+                const groups = {};
+                rows.slice(1).forEach(columns => {
+                    const x = parseFloat(columns[xIndex]);
+                    const y = parseFloat(columns[yIndex]);
+                    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+                        return;
+                    }
+                    const group = typeIndex >= 0 ? columns[typeIndex] || 'Unknown' : 'Unknown';
+                    const label = labelIndex >= 0 ? columns[labelIndex] : '';
+                    groups[group] = groups[group] || [];
+                    groups[group].push({ value: [x, y, label], label });
+                });
+
+                const series = Object.keys(groups).map(name => ({
+                    name,
+                    type: 'scatter',
+                    data: groups[name].map(item => item.value),
+                    symbolSize: 6,
+                    clip: true,
+                    emphasis: {
+                        focus: 'series',
+                        label: {
+                            show: true,
+                            formatter: params => params.data[2] || params.seriesName,
+                            position: 'top'
+                        }
+                    }
+                }));
+
+                const option = {
+                    title: {
+                        text: 'Single-cell UMAP',
+                        left: 'center',
+                        textStyle: { fontSize: 16 }
+                    },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: params => {
+                            const value = params.data;
+                            const label = value[2] || '';
+                            return `<strong>${params.seriesName}</strong><br/>UMAP 1: ${value[0].toFixed(3)}<br/>UMAP 2: ${value[1].toFixed(3)}${label ? `<br/>${label}` : ''}`;
+                        }
+                    },
+                    legend: {
+                        type: 'scroll',
+                        top: 30,
+                        left: 'auto',
+                        right: 10,
+                        bottom: 10,
+                        orient: 'vertical'
+                    },
+                    grid: {
+                        left: '8%',
+                        right: '10%',
+                        bottom: '12%',
+                        top: '14%',
+                    },
+                    xAxis: {
+                        name: 'UMAP 1',
+                        scale: true,
+                        splitLine: { show: false }
+                    },
+                    yAxis: {
+                        name: 'UMAP 2',
+                        scale: true,
+                        splitLine: { show: false }
+                    },
+                    dataZoom: [{ type: 'inside' }, { type: 'slider', show: true }],
+                    series,
+                };
+
+                umapChartInstance.hideLoading();
+                umapChartInstance.setOption(option);
+                if (messageEl) {
+                    messageEl.textContent = `Loaded ${rows.length - 1} UMAP points from ${datasetUrl.split('/').pop()}.`;
+                }
+                window.dispatchEvent(new Event('resize'));
+            })
+            .catch(error => {
+                console.error('Failed to load UMAP file:', error);
+                if (messageEl) {
+                    messageEl.textContent = `UMAP visualization error: ${error.message}`;
+                }
+                umapChartInstance.hideLoading();
+            });
+    }
+
+    function initUmapVisualization() {
+        const selectEl = document.getElementById('umapDatasetSelect');
+        const datasetUrl = selectEl ? selectEl.value : (umapDatasets[0] && umapDatasets[0].url);
+        if (!datasetUrl) {
+            return;
+        }
+        renderUmapChart(datasetUrl);
+        umapInitialized = true;
+        if (selectEl) {
+            selectEl.addEventListener('change', event => renderUmapChart(event.target.value));
+        }
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('d-none'));
+        document.querySelectorAll('.tab-btn-group .btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('content-' + tab).classList.remove('d-none');
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (tab === 'singlecell') {
+            if (!umapInitialized && umapDatasets.length) {
+                initUmapVisualization();
+            } else if (umapChartInstance) {
+                setTimeout(() => umapChartInstance.resize(), 100);
+            }
+        }
+    }
+
+    window.addEventListener('load', function() {
+        const gbifId = '{{ gbif_id|default:'' }}';
+        const wormsId = '{{ tax.worms_id|default:'' }}';
+        const ncbiId = '{{ tax.ncbi_taxonomy_id|default:'' }}';
+        const scientificName = '{{ tax.species|escapejs }}';
+        renderGbifOccurrenceMap(gbifId);
+        loadGbifImages(gbifId);
+        loadWormsTaxonomy(wormsId);
+        loadNcbiTaxonomy(ncbiId);
+        loadGbifSpeciesInfo(gbifId);
+        loadObisDepth(wormsId, scientificName);
+        initUmapVisualization();
+    });
+    window.addEventListener('resize', debounce(() => {
+        if (gbifMapInstance && typeof gbifMapInstance.resize === 'function') {
+            gbifMapInstance.resize();
+        }
+    }, 200));
+</script>
+{% endblock %}
